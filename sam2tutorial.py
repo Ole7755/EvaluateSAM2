@@ -17,8 +17,8 @@ def main() -> None:
 
     predictor = SAM2ImagePredictor(
         build_sam2(
-            model_cfg=config_path.as_posix(),
-            ckpt=checkpoint_path.as_posix(),
+            config_path.as_posix(),
+            checkpoint_path.as_posix(),
         )
     )
 
