@@ -12,12 +12,17 @@ def main() -> None:
     script_dir = Path(__file__).resolve().parent
 
     checkpoint_path = script_dir / "sam2_hiera_small.pt"
-    config_path = script_dir / "sam2_hiera_s.yaml"
     image_path = script_dir / "German_shepherd.jpeg"
 
+    if not checkpoint_path.exists():
+        raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}")
+    if not image_path.exists():
+        raise FileNotFoundError(f"Image not found at {image_path}")
+
+    config_name = "sam2_hiera_s"
     predictor = SAM2ImagePredictor(
         build_sam2(
-            config_path.as_posix(),
+            config_name,
             checkpoint_path.as_posix(),
         )
     )
