@@ -16,3 +16,12 @@
       --gt-label 1
     ```
   - 日志写入 `logs/<sequence>/attacks/<attack>/`，扰动和可视化结果存放在 `outputs/<sequence>/<attack>/`。
+
+## 新增：数据集信息脚本
+
+- `inspect_davis_dataset.py`：遍历 `data/DAVIS` 下的序列，统计帧数、分辨率，以及可选的首帧掩码标签占比，用于快速挑选基线效果较好的样本。  
+  - 默认读取 `JPEGImages/<resolution>` 与 `Annotations_unsupervised/<resolution>`，可通过参数覆盖：  
+    ```bash
+    python -m scripts.inspect_davis_dataset --resolution 480p --show-mask-stats
+    ``` 
+  - 支持 `--output-json path/to/summary.json` 将统计信息保存为文件。
