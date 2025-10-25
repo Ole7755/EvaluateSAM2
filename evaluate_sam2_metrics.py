@@ -54,6 +54,7 @@ def evaluate_directory(
     obj_id: Optional[int] = None,
     gt_label: Optional[int] = None,
     threshold: float = 0.0,
+    output_path: Optional[Path] = None,
 ) -> Dict[str, float]:
     """Evaluate predictions stored in pred_dir against gt_dir."""
     pred_paths = sorted(pred_dir.glob("*.png"))
@@ -88,14 +89,31 @@ def evaluate_directory(
     mean_iou = float(np.mean(iou_values))
     mean_dice = float(np.mean(dice_values))
 
-    print(f"\nMean IoU: {mean_iou:.4f}")
-    print(f"Mean Dice: {mean_dice:.4f}")
-
-    return {
+    summary = {
         "mean_iou": mean_iou,
         "mean_dice": mean_dice,
         "frames_evaluated": len(per_frame),
+        "pred_dir": str(pred_dir),
+        "gt_dir": str(gt_dir),
+        "obj_id": obj_id,
+        "gt_label": gt_label,
+        "threshold": threshold,
     }
+
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with output_path.open("w", encoding="utf-8") as f:
+            f.write("frame,IoU,Dice\n")
+            for frame_token, iou, dice in per_frame:
+                f.write(f"{frame_token},{iou:.6f},{dice:.6f}\n")
+            f.write("\n")
+            for key, value in summary.items():
+                f.write(f"{key}:{value}\n")
+
+    print(f"\nMean IoU: {mean_iou:.4f}")
+    print(f"Mean Dice: {mean_dice:.4f}")
+
+    return summary
 
 
 def parse_args() -> argparse.Namespace:
@@ -120,6 +138,12 @@ def parse_args() -> argparse.Namespace:
         default=0.0,
         help="Pixel threshold for binarising masks when gt_label is not provided.",
     )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Optional path to save per-frame and summary metrics (CSV-like).",
+    )
     return parser.parse_args()
 
 
@@ -131,6 +155,7 @@ def main() -> None:
         obj_id=args.obj_id,
         gt_label=args.gt_label,
         threshold=args.threshold,
+        output_path=args.output,
     )
 
 
