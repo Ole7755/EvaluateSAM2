@@ -362,7 +362,14 @@ class SAM2ForwardHelper(ForwardHelperBase):
                 "target_hw": target_hw,
                 "feat_sizes": feat_sizes,
                 "reshaped_shapes": [tuple(t.shape) for t in reshaped_feats],
+                "backbone_out_keys": list(backbone_out.keys()) if isinstance(backbone_out, dict) else type(backbone_out),
             }
+            if isinstance(backbone_out, dict) and "high_res_feats" in backbone_out:
+                high_res = backbone_out["high_res_feats"]
+                if isinstance(high_res, (list, tuple)):
+                    debug_info["high_res_feats_shapes"] = [tuple(t.shape) for t in high_res]
+                else:
+                    debug_info["high_res_feats_type"] = type(high_res)
             print("[DEBUG] SAM2ForwardHelper feature summary:", debug_info)
             self._debug_logged = True
 
