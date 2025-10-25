@@ -353,15 +353,6 @@ class SAM2ForwardHelper(ForwardHelperBase):
             feat_sizes,
         ) = self.predictor._prepare_backbone_features(backbone_raw)
 
-        high_res_features = None
-        if len(current_vision_feats) > 1:
-            high_res_features = []
-            for idx, feat in enumerate(current_vision_feats[:-1]):
-                size = feat_sizes[idx]
-                high_res = feat.permute(1, 2, 0).view(feat.size(1), feat.size(2), size[0], size[1])
-                high_res_features.append(high_res)
-            high_res_features = tuple(high_res_features)
-
         last_feat = current_vision_feats[-1]
         H, W = feat_sizes[-1]
         backbone_features = last_feat.permute(1, 2, 0).view(last_feat.size(1), last_feat.size(2), H, W)
@@ -373,7 +364,7 @@ class SAM2ForwardHelper(ForwardHelperBase):
             backbone_features=backbone_features,
             point_inputs=point_inputs,
             mask_inputs=mask_inputs,
-            high_res_features=high_res_features,
+            high_res_features=None,
             multimask_output=False,
         )
 
