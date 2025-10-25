@@ -36,6 +36,8 @@
 ------
 - 2025-10-24：完成 `walking` 序列双目标分割的排障，梳理多点提示策略与输出存储逻辑。
 - 2025-10-25：整理仓库结构，统一脚本路径依赖；编写基于首帧掩码的单/多目标脚本；搭建 mIoU、Dice 评估工具。
+- 2025-10-26：修复 `run_uap_attack` 前向封装，复用 `predictor.forward_image` 获取 FPN 投影特征，解决高分辨率特征通道错配；`bear` 序列 FGSM 攻击基线跑通并产出日志。
+- 2025-10-26：扩展攻击脚本，自动追踪并缓存最佳 / 最差攻击案例的原图、对抗样本与扰动可视化，便于快速复盘。
 
 下一步计划
 ------
@@ -48,4 +50,5 @@
   ```
   RuntimeError: The size of tensor a (32) must match the size of tensor b (256) at non-singleton dimension 1
   ```
-  定位在 `sam2/modeling/sam/mask_decoder.py` 的 `predict_masks` 函数。正在排查高分辨率特征与解码器输入对齐问题。
+-  定位在 `sam2/modeling/sam/mask_decoder.py` 的 `predict_masks` 函数。正在排查高分辨率特征与解码器输入对齐问题。
+-  2025-10-26：通过调用预测器自带的 `forward_image` 获取投影后的 FPN 特征并补充高分辨率分支输入，问题已解决。

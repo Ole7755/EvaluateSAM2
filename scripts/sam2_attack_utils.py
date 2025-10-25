@@ -15,6 +15,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
+import shutil
 
 import numpy as np
 import torch
@@ -64,6 +65,26 @@ def save_rgb_tensor(tensor: torch.Tensor, save_path: Path) -> None:
     """
     tensor = tensor.detach().cpu().clamp(0.0, 1.0)
     array = (tensor.numpy().transpose(1, 2, 0) * 255.0).round().astype(np.uint8)
+    Image.fromarray(array).save(save_path)
+
+
+def save_perturbation_image(tensor: torch.Tensor, save_path: Path) -> None:
+    """
+    将扰动张量可视化后保存为 PNG。
+
+    采用零点居中显示，将最大绝对值映射为 1。
+    """
+    if tensor.ndim == 4:
+        if tensor.size(0) != 1:
+            raise ValueError("暂不支持批量扰动可视化。")
+        tensor = tensor.squeeze(0)
+    tensor = tensor.detach().cpu()
+    max_abs = float(tensor.abs().max().item())
+    if max_abs <= 1e-8:
+        max_abs = 1.0
+    scaled = (tensor / (2 * max_abs)) + 0.5
+    scaled = scaled.clamp(0.0, 1.0)
+    array = (scaled.numpy().transpose(1, 2, 0) * 255.0).round().astype(np.uint8)
     Image.fromarray(array).save(save_path)
 
 
@@ -215,6 +236,7 @@ class AttackConfig:
 class AttackSummary:
     """记录一次攻击的概览信息。"""
 
+    attack_name: str
     sequence: str
     frame_idx: int
     obj_id: int
@@ -261,3 +283,106 @@ class AttackLogger:
         path = self.log_dir / f"{name}_{self._timestamp()}.pt"
         torch.save(tensor.detach().cpu(), path)
         return path
+
+
+class BestWorstTracker:
+    """维护同一攻击类型下最佳 / 最差案例，并保存相关图像。"""
+
+    def __init__(self, record_path: Path, best_dir: Path, worst_dir: Path) -> None:
+        self.record_path = record_path
+        self.best_root = ensure_dir(best_dir)
+        self.worst_root = ensure_dir(worst_dir)
+        self.state = self._load_state()
+
+    def _load_state(self) -> Dict[str, Dict[str, Any]]:
+        if self.record_path.exists():
+            with self.record_path.open("r", encoding="utf-8") as f:
+                return json.load(f)
+        return {}
+
+    def _save_state(self) -> None:
+        ensure_dir(self.record_path.parent)
+        with self.record_path.open("w", encoding="utf-8") as f:
+            json.dump(self.state, f, ensure_ascii=False, indent=2)
+
+    def _remove_artifacts(self, artifacts: Dict[str, str]) -> None:
+        for path_str in artifacts.values():
+            path = Path(path_str)
+            if path.exists():
+                path.unlink()
+
+    def _format_prefix(self, summary: AttackSummary) -> str:
+        return (
+            f"{summary.attack_name}_"
+            f"{summary.sequence}_"
+            f"frame{summary.frame_idx:05d}_"
+            f"obj{summary.obj_id}"
+        )
+
+    def update(
+        self,
+        summary: AttackSummary,
+        artifacts: Dict[str, Path],
+        attack_name: Optional[str] = None,
+        score: Optional[float] = None,
+    ) -> Dict[str, bool]:
+        attack_key = attack_name or summary.attack_name
+        container = self.state.setdefault(attack_key, {"best": None, "worst": None})
+        score_value = summary.adv_iou if score is None else score
+
+        best_updated = False
+        worst_updated = False
+
+        if container["best"] is None or score_value < container["best"]["score"]:
+            best_updated = True
+            container["best"] = self._store_record(
+                summary,
+                artifacts,
+                score_value,
+                target_root=self.best_root / attack_key,
+                existing=container["best"],
+            )
+
+        if container["worst"] is None or score_value > container["worst"]["score"]:
+            worst_updated = True
+            container["worst"] = self._store_record(
+                summary,
+                artifacts,
+                score_value,
+                target_root=self.worst_root / attack_key,
+                existing=container["worst"],
+            )
+
+        if best_updated or worst_updated:
+            self._save_state()
+
+        return {"best": best_updated, "worst": worst_updated}
+
+    def _store_record(
+        self,
+        summary: AttackSummary,
+        artifacts: Dict[str, Path],
+        score: float,
+        target_root: Path,
+        existing: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        target_root = ensure_dir(target_root)
+        if existing is not None and "artifacts" in existing:
+            self._remove_artifacts(existing["artifacts"])
+
+        prefix = self._format_prefix(summary)
+        stored_paths: Dict[str, str] = {}
+        for name, src in artifacts.items():
+            src_path = Path(src)
+            if not src_path.exists():
+                continue
+            dest_path = target_root / f"{prefix}_{name}{src_path.suffix}"
+            shutil.copy2(src_path, dest_path)
+            stored_paths[name] = str(dest_path)
+
+        record = {
+            "score": score,
+            "summary": asdict(summary),
+            "artifacts": stored_paths,
+        }
+        return record

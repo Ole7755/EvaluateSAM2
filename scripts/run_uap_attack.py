@@ -25,6 +25,7 @@ from scripts.sam2_attack_utils import (
     AttackConfig,
     AttackLogger,
     AttackSummary,
+    BestWorstTracker,
     compute_perturbation_norms,
     eval_masks_numpy,
     load_mask_tensor,
@@ -33,6 +34,7 @@ from scripts.sam2_attack_utils import (
     resize_image_tensor,
     resize_mask_tensor,
     save_rgb_tensor,
+    save_perturbation_image,
 )
 from scripts.uap_attacks import (
     FGSMAttack,
@@ -206,6 +208,11 @@ def main() -> None:
     attack_dir.mkdir(parents=True, exist_ok=True)
     log_dir = LOG_ROOT / sequence / "attacks" / args.attack
     logger = AttackLogger(log_dir)
+    tracker = BestWorstTracker(
+        record_path=log_dir / "best_worst.json",
+        best_dir=attack_dir / "best_cases",
+        worst_dir=attack_dir / "worst_cases",
+    )
     logger.save_config(attack_config)
 
     # 计算干净样本的预测，用于基线指标
@@ -230,7 +237,33 @@ def main() -> None:
 
     # 计算扰动范数并写入日志
     perturbation_norms = compute_perturbation_norms(perturbation)
+
+    clean_vis = (
+        F.interpolate(clean_input, size=origin_hw, mode="bilinear", align_corners=False)
+        .squeeze(0)
+        .detach()
+    )
+    adv_vis = (
+        F.interpolate(adv_input, size=origin_hw, mode="bilinear", align_corners=False)
+        .squeeze(0)
+        .detach()
+    )
+    perturbation_vis = (
+        F.interpolate(perturbation, size=origin_hw, mode="bilinear", align_corners=False)
+        .squeeze(0)
+        .detach()
+    )
+
+    clean_image_path = attack_dir / f"{frame_token}_clean.png"
+    adv_image_path = attack_dir / f"{frame_token}_adv.png"
+    perturbation_image_path = attack_dir / f"{frame_token}_perturbation.png"
+
+    save_rgb_tensor(clean_vis, clean_image_path)
+    save_rgb_tensor(adv_vis, adv_image_path)
+    save_perturbation_image(perturbation_vis, perturbation_image_path)
+
     summary = AttackSummary(
+        attack_name=args.attack,
         sequence=sequence,
         frame_idx=int(frame_token),
         obj_id=args.obj_id,
@@ -244,12 +277,20 @@ def main() -> None:
     logger.save_summary(summary, extra={"frame_path": str(frame_path), "mask_path": str(mask_path)})
     logger.save_tensor(perturbation.squeeze(0), name=f"{sequence}_{args.attack}_uap")
 
-    # 保存攻前 / 攻后图像和预测掩码
-    clean_vis = F.interpolate(clean_input, size=origin_hw, mode="bilinear", align_corners=False).squeeze(0)
-    adv_vis = F.interpolate(adv_input, size=origin_hw, mode="bilinear", align_corners=False).squeeze(0)
-
-    save_rgb_tensor(clean_vis, attack_dir / f"{frame_token}_clean.png")
-    save_rgb_tensor(adv_vis, attack_dir / f"{frame_token}_adv.png")
+    artifacts = {
+        "clean": clean_image_path,
+        "adv": adv_image_path,
+        "perturbation": perturbation_image_path,
+    }
+    tracker_update = tracker.update(summary, artifacts, attack_name=args.attack, score=adv_iou)
+    if tracker_update["best"]:
+        print(
+            f"[INFO] 当前结果刷新最佳攻击案例 (adv_iou={adv_iou:.6f})，已保存至 {tracker.best_root / args.attack}"
+        )
+    if tracker_update["worst"]:
+        print(
+            f"[INFO] 当前结果刷新最差攻击案例 (adv_iou={adv_iou:.6f})，已保存至 {tracker.worst_root / args.attack}"
+        )
 
     mask_dir = attack_dir / "masks"
     mask_dir.mkdir(parents=True, exist_ok=True)
