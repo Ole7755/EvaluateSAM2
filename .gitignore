@@ -2,3 +2,4 @@ sam2/
 *.pt
 data/DAVIS
 outputs/bear
+scripts/__pycache__

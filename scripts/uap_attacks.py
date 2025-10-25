@@ -345,73 +345,22 @@ class SAM2ForwardHelper(ForwardHelperBase):
 
         normalized = (image_tensor - self.mean) / self.std
 
-        # 1) 编码
+        # 1) 主干编码并按官方逻辑准备特征
         backbone_out = self.image_encoder(normalized)
-        if isinstance(backbone_out, dict):
-            image_embeddings = backbone_out["vision_features"]      # e.g. [B,256,64,64]
-            backbone_fpn = backbone_out.get("backbone_fpn", None)   # 可能是 list/tuple/None
-        else:
-            image_embeddings = backbone_out
-            backbone_fpn = None
+        backbone_features, high_res_features = self.predictor._prepare_backbone_features(backbone_out)
 
         # 2) 提示编码
         sparse_embeddings, dense_embeddings = self._encode_prompts(
             prompt_points, prompt_boxes, prompt_mask
         )
 
-        # 3) 对齐 dense 到 image_embeddings 尺寸
-        if isinstance(dense_embeddings, torch.Tensor) and \
-        dense_embeddings.shape[-2:] != image_embeddings.shape[-2:]:
-            dense_embeddings = F.interpolate(
-                dense_embeddings,
-                size=image_embeddings.shape[-2:],
-                mode="bilinear",
-                align_corners=False,
-            )
-
-        # 4) 构造 high_res_features，显式匹配解码器期望的空间尺寸
-        B, Csrc, Hs, Ws = image_embeddings.shape
-        target_s1 = (Hs * 2, Ws * 2)  # 将与 dc1(src) 对齐
-        target_s0 = (Hs * 4, Ws * 4)
-
-        # 收集候选高分辨率特征
-        feats = []
-        if isinstance(backbone_fpn, (list, tuple)):
-            feats = [t for t in backbone_fpn if isinstance(t, torch.Tensor)]
-
-        # 若没有候选，就用 image_embeddings 生成
-        if len(feats) == 0:
-            feats = [image_embeddings, image_embeddings]
-
-        # 按空间分辨率降序
-        feats = sorted(feats, key=lambda t: (t.shape[-2] * t.shape[-1]), reverse=True)
-        base0 = feats[0]
-        base1 = feats[1] if len(feats) >= 2 else feats[0]
-
-        # 尺寸对齐到目标
-        feat_s0 = F.interpolate(base0, size=target_s0, mode="bilinear", align_corners=False)
-        feat_s1_tmp = F.interpolate(base1, size=target_s1, mode="bilinear", align_corners=False)
-
-        # 将 feat_s1 通道变为 64（无参数分组均值，稳定可微）
-        def reduce_to_64(x: torch.Tensor) -> torch.Tensor:
-            B, C, H, W = x.shape
-            assert C % 64 == 0, f"通道 {C} 不能被 64 整除"
-            g = C // 64
-            return x.view(B, 64, g, H, W).mean(dim=2)
-
-        feat_s1 = feat_s1_tmp if feat_s1_tmp.shape[1] == 64 else reduce_to_64(feat_s1_tmp)
-
-        high_res_features = (feat_s0, feat_s1)
-
-        # 5) 解码
-        low_res_masks, _ = self.mask_decoder(
-            image_embeddings=image_embeddings,
-            image_pe=self.dense_pe,
-            sparse_prompt_embeddings=sparse_embeddings,
-            dense_prompt_embeddings=dense_embeddings,
-            multimask_output=False,
-            repeat_image=False,
+        # 3) 调用预测器内部的 SAM heads，以保持特征维度与官方实现一致
+        low_res_masks, _ = self.predictor._forward_sam_heads(
+            backbone_features=backbone_features,
+            point_inputs=sparse_embeddings,
+            mask_inputs=dense_embeddings,
             high_res_features=high_res_features,
+            multimask_output=False,
         )
 
         # 6) 上采样回输入大小
