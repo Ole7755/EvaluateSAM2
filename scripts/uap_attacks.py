@@ -355,7 +355,23 @@ class SAM2ForwardHelper(ForwardHelperBase):
 
         last_feat = current_vision_feats[-1]
         H, W = feat_sizes[-1]
-        backbone_features = last_feat.permute(1, 2, 0).view(last_feat.size(1), last_feat.size(2), H, W)
+
+        if last_feat.ndim == 3:
+            batch, tokens, dim = last_feat.shape
+            if tokens != H * W:
+                raise ValueError(
+                    f"无法将视觉特征重排为 {H}x{W}：tokens={tokens}，期望 {H * W}。"
+                )
+            backbone_features = last_feat.transpose(1, 2).contiguous().view(batch, dim, H, W)
+        elif last_feat.ndim == 4:
+            if last_feat.shape[-2:] == (H, W) and last_feat.shape[1] != H:
+                backbone_features = last_feat
+            elif last_feat.shape[1:3] == (H, W):
+                backbone_features = last_feat.permute(0, 3, 1, 2).contiguous()
+            else:
+                raise ValueError(f"无法识别的视觉特征排列：{last_feat.shape}，预期包含 {H}x{W}。")
+        else:
+            raise ValueError(f"不支持的视觉特征维度：{last_feat.shape}")
 
         point_inputs = self._prepare_point_inputs(prompt_points)
         mask_inputs = self._prepare_mask_inputs(prompt_mask)

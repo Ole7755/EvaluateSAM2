@@ -41,3 +41,11 @@
 ------
 - 调研并实现首批对抗攻击方法（例如扰动提示点、像素级对抗扰动），衡量对 SAM2 分割性能的影响。
 - 根据实验需要扩展脚本参数化程度（序列选择、对象数量、攻击配置等），确保流程可复用、可批量化。
+
+问题记录
+------
+- 2025-??-??：`python -m scripts.run_uap_attack --sequence bear --attack fgsm --epsilon 0.03 --gt-label 1 --device cuda` 运行失败，报错：
+  ```
+  RuntimeError: The size of tensor a (32) must match the size of tensor b (256) at non-singleton dimension 1
+  ```
+  定位在 `sam2/modeling/sam/mask_decoder.py` 的 `predict_masks` 函数。正在排查高分辨率特征与解码器输入对齐问题。
