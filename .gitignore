@@ -1,2 +1,4 @@
 sam2/
 *.pt
+data/DAVIS
+outputs/bear
