@@ -333,79 +333,75 @@ class SAM2ForwardHelper(ForwardHelperBase):
         self.dense_pe = self.prompt_encoder.get_dense_pe().to(device)
 
     def forward(
-    self,
-    image_tensor: torch.Tensor,
-    prompt_points: Optional[torch.Tensor] = None,
-    prompt_boxes: Optional[torch.Tensor] = None,
-    prompt_mask: Optional[torch.Tensor] = None,
-) -> ForwardOutput:
+        self,
+        image_tensor: torch.Tensor,
+        prompt_points: Optional[torch.Tensor] = None,
+        prompt_boxes: Optional[torch.Tensor] = None,
+        prompt_mask: Optional[torch.Tensor] = None,
+    ) -> ForwardOutput:
         if image_tensor.ndim == 3:
             image_tensor = image_tensor.unsqueeze(0)
         image_tensor = image_tensor.to(self.device)
 
         normalized = (image_tensor - self.mean) / self.std
 
-        # 1) 主干编码并按官方逻辑准备特征
-        backbone_out = self.image_encoder(normalized)
-        backbone_features, high_res_features = self.predictor._prepare_backbone_features(backbone_out)
+        backbone_raw = self.image_encoder(normalized)
+        (
+            backbone_out,
+            current_vision_feats,
+            current_vision_pos_embeds,
+            feat_sizes,
+        ) = self.predictor._prepare_backbone_features(backbone_raw)
 
-        # 2) 提示编码
-        sparse_embeddings, dense_embeddings = self._encode_prompts(
-            prompt_points, prompt_boxes, prompt_mask
-        )
+        high_res_features = None
+        if len(current_vision_feats) > 1:
+            high_res_features = []
+            for idx, feat in enumerate(current_vision_feats[:-1]):
+                size = feat_sizes[idx]
+                high_res = feat.permute(1, 2, 0).view(feat.size(1), feat.size(2), size[0], size[1])
+                high_res_features.append(high_res)
+            high_res_features = tuple(high_res_features)
 
-        # 3) 调用预测器内部的 SAM heads，以保持特征维度与官方实现一致
-        low_res_masks, _ = self.predictor._forward_sam_heads(
+        last_feat = current_vision_feats[-1]
+        H, W = feat_sizes[-1]
+        backbone_features = last_feat.permute(1, 2, 0).view(last_feat.size(1), last_feat.size(2), H, W)
+
+        point_inputs = self._prepare_point_inputs(prompt_points)
+        mask_inputs = self._prepare_mask_inputs(prompt_mask)
+
+        sam_outputs = self.predictor._forward_sam_heads(
             backbone_features=backbone_features,
-            point_inputs=sparse_embeddings,
-            mask_inputs=dense_embeddings,
+            point_inputs=point_inputs,
+            mask_inputs=mask_inputs,
             high_res_features=high_res_features,
             multimask_output=False,
         )
 
-        # 6) 上采样回输入大小
+        low_res_masks = sam_outputs[3]
+
         logits = F.interpolate(
             low_res_masks, size=image_tensor.shape[-2:], mode="bilinear", align_corners=False
         )
         probs = torch.sigmoid(logits)
         return ForwardOutput(logits=logits, probs=probs)
 
-    def _encode_prompts(
-        self,
-        prompt_points: Optional[torch.Tensor],
-        prompt_boxes: Optional[torch.Tensor],
-        prompt_mask: Optional[torch.Tensor],
-    ):
-        """
-        根据输入提示生成稀疏 / 稠密提示向量。
+    def _prepare_point_inputs(
+        self, prompt_points: Optional[torch.Tensor]
+    ) -> Optional[dict[str, torch.Tensor]]:
+        if prompt_points is None:
+            return None
+        if prompt_points.ndim == 2:
+            prompt_points = prompt_points.unsqueeze(0)
+        coords = prompt_points[..., :2].to(self.device)
+        labels = prompt_points[..., 2].to(self.device).to(torch.int32)
+        return {"point_coords": coords, "point_labels": labels}
 
-        目前支持掩码提示；点与框后续可扩展。
-        """
-        points_tuple = None
-        if prompt_points is not None:
-            if prompt_points.ndim == 2:
-                prompt_points = prompt_points.unsqueeze(0)
-            coords = prompt_points[..., :2].to(self.device)
-            labels = prompt_points[..., 2].to(self.device)
-            points_tuple = (coords, labels)
-
-        boxes_tensor = None
-        if prompt_boxes is not None:
-            boxes_tensor = prompt_boxes.to(self.device)
-            if boxes_tensor.ndim == 2:
-                boxes_tensor = boxes_tensor.unsqueeze(0)
-
-        mask_tensor = None
-        if prompt_mask is not None:
-            mask_tensor = prompt_mask.to(self.device)
-            if mask_tensor.ndim == 3:
-                mask_tensor = mask_tensor.unsqueeze(1)
-            elif mask_tensor.ndim == 4 and mask_tensor.shape[1] != 1:
-                raise ValueError("掩码提示张量应为 [B, 1, H, W] 格式。")
-
-        sparse_embeddings, dense_embeddings = self.prompt_encoder.forward(
-            points=points_tuple,
-            boxes=boxes_tensor,
-            masks=mask_tensor,
-        )
-        return sparse_embeddings, dense_embeddings
+    def _prepare_mask_inputs(self, prompt_mask: Optional[torch.Tensor]) -> Optional[torch.Tensor]:
+        if prompt_mask is None:
+            return None
+        mask = prompt_mask.to(self.device)
+        if mask.ndim == 3:
+            mask = mask.unsqueeze(0)
+        if mask.ndim == 4 and mask.shape[1] == 1:
+            return mask
+        raise ValueError("掩码提示张量必须为 [B, 1, H, W] 格式。")
