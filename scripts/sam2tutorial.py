@@ -8,14 +8,17 @@ from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+WEIGHT_PATH = PROJECT_ROOT / "weights" / "sam2_hiera_small.pt"
+OUTPUT_ROOT = PROJECT_ROOT / "outputs" / "tutorial"
+
+
 def main() -> None:
     script_dir = Path(__file__).resolve().parent
-
-    checkpoint_path = script_dir / "sam2_hiera_small.pt"
     image_path = script_dir / "German_shepherd.jpeg"
 
-    if not checkpoint_path.exists():
-        raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}")
+    if not WEIGHT_PATH.exists():
+        raise FileNotFoundError(f"Checkpoint not found at {WEIGHT_PATH}")
     if not image_path.exists():
         raise FileNotFoundError(f"Image not found at {image_path}")
 
@@ -23,7 +26,7 @@ def main() -> None:
     predictor = SAM2ImagePredictor(
         build_sam2(
             config_name,
-            checkpoint_path.as_posix(),
+            WEIGHT_PATH.as_posix(),
         )
     )
 
@@ -43,7 +46,7 @@ def main() -> None:
         image=image,
         mask=mask,
         points=input_points,
-        output_dir=script_dir / "outputs",
+        output_dir=OUTPUT_ROOT,
         output_name="German_shepherd_mask.png",
     )
 

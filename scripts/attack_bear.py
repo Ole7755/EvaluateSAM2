@@ -8,6 +8,13 @@ from PIL import Image
 from sam2.build_sam import build_sam2_video_predictor
 
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+CONFIG_PATH = PROJECT_ROOT / "configs" / "sam2_hiera_s.yaml"
+WEIGHT_PATH = PROJECT_ROOT / "weights" / "sam2_hiera_small.pt"
+DATA_ROOT = PROJECT_ROOT / "data" / "DAVIS"
+OUTPUT_ROOT = PROJECT_ROOT / "outputs"
+
+
 def load_binary_mask(mask_path: Path) -> torch.Tensor:
     mask = np.array(Image.open(mask_path))
     if mask.ndim == 3:
@@ -32,13 +39,21 @@ def normalize_masks(masks: torch.Tensor | Sequence[torch.Tensor]) -> list[torch.
     return [torch.as_tensor(mask) for mask in masks]
 
 
-check_point = "sam2_hiera_small.pt"
-model_cfg = "sam2_hiera_s.yaml"
-predictor = build_sam2_video_predictor(model_cfg, check_point)
+if not CONFIG_PATH.exists():
+    raise FileNotFoundError(f"未找到 SAM2 配置文件：{CONFIG_PATH}")
+if not WEIGHT_PATH.exists():
+    raise FileNotFoundError(f"未找到 SAM2 权重文件：{WEIGHT_PATH}")
+
+predictor = build_sam2_video_predictor(CONFIG_PATH.as_posix(), WEIGHT_PATH.as_posix())
 
 seq = "bear"
-rgb_dir = Path("DAVIS/JPEGImages/480p/bear")
-ann_dir = Path("DAVIS/Annotations_unsupervised/480p/bear")
+rgb_dir = DATA_ROOT / "JPEGImages" / "480p" / seq
+ann_dir = DATA_ROOT / "Annotations_unsupervised" / "480p" / seq
+
+if not rgb_dir.exists():
+    raise FileNotFoundError(f"未找到序列帧目录：{rgb_dir}")
+if not ann_dir.exists():
+    raise FileNotFoundError(f"未找到标注目录：{ann_dir}")
 
 state = predictor.init_state(rgb_dir.as_posix())
 
@@ -66,11 +81,10 @@ frame_idx, object_ids, masks = initial
 object_ids_list = normalize_object_ids(object_ids)
 masks_list = normalize_masks(masks)
 
-out_dir = Path("outputs/bear")
+out_dir = OUTPUT_ROOT / seq
 out_dir.mkdir(parents=True, exist_ok=True)
 
 for obj_id, mask in zip(object_ids_list, masks_list):
-    mask = mask.squeeze()
     mask_u8 = (mask > 0.5).to(torch.uint8).cpu().numpy() * 255
     Image.fromarray(mask_u8).save(out_dir / f"{frame_idx:05d}_id{obj_id}.png")
 
@@ -78,6 +92,5 @@ for frame_idx, object_ids, masks in predictor.propagate_in_video(state):
     object_ids_list = normalize_object_ids(object_ids)
     masks_list = normalize_masks(masks)
     for obj_id, mask in zip(object_ids_list, masks_list):
-        mask = mask.squeeze()
         mask_u8 = (mask > 0.5).to(torch.uint8).cpu().numpy() * 255
         Image.fromarray(mask_u8).save(out_dir / f"{frame_idx:05d}_id{obj_id}.png")

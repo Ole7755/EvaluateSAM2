@@ -7,6 +7,13 @@ from PIL import Image
 from sam2.build_sam import build_sam2_video_predictor
 
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+CONFIG_PATH = PROJECT_ROOT / "configs" / "sam2_hiera_s.yaml"
+WEIGHT_PATH = PROJECT_ROOT / "weights" / "sam2_hiera_small.pt"
+DATA_ROOT = PROJECT_ROOT / "data" / "DAVIS"
+OUTPUT_ROOT = PROJECT_ROOT / "outputs"
+
+
 def load_mask_tensor(mask_path: Path) -> torch.Tensor:
     mask = np.array(Image.open(mask_path))
     print(mask.dtype)
@@ -42,8 +49,7 @@ def save_masks(
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     for obj_id, mask_tensor in zip(object_ids, masks):
-        mask_2d = mask_tensor.squeeze()
-        mask_u8 = (mask_2d > 0.5).to(torch.uint8).cpu().numpy() * 255
+        mask_u8 = (mask_tensor > 0.5).to(torch.uint8).cpu().numpy() * 255
         save_path = output_dir / f"{frame_idx:05d}_id{obj_id}.png"
         Image.fromarray(mask_u8).save(save_path)
 
@@ -123,17 +129,22 @@ def sample_points_from_mask(
 
 def main() -> None:
     sequence = "walking"
-    rgb_dir = Path("DAVIS/JPEGImages/480p/walking")
+    rgb_dir = DATA_ROOT / "JPEGImages" / "480p" / sequence
     if not rgb_dir.exists():
         raise FileNotFoundError(f"RGB frames not found at {rgb_dir}")
 
-    mask_path = Path("DAVIS/Annotations_unsupervised/480p/walking/00000.png")
+    mask_path = DATA_ROOT / "Annotations_unsupervised" / "480p" / sequence / "00000.png"
     if not mask_path.exists():
         raise FileNotFoundError(f"First-frame mask not found at {mask_path}")
 
-    output_dir = Path("output") / "walking"
+    output_dir = OUTPUT_ROOT / sequence
 
-    predictor = build_sam2_video_predictor("sam2_hiera_s.yaml", "sam2_hiera_small.pt")
+    if not CONFIG_PATH.exists():
+        raise FileNotFoundError(f"未找到 SAM2 配置文件：{CONFIG_PATH}")
+    if not WEIGHT_PATH.exists():
+        raise FileNotFoundError(f"未找到 SAM2 权重文件：{WEIGHT_PATH}")
+
+    predictor = build_sam2_video_predictor(CONFIG_PATH.as_posix(), WEIGHT_PATH.as_posix())
     state = predictor.init_state(rgb_dir.as_posix())
 
     first_mask = load_mask_tensor(mask_path)
