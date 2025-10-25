@@ -360,6 +360,8 @@ class SAM2ForwardHelper(ForwardHelperBase):
             sparse_prompt_embeddings=sparse_embeddings,
             dense_prompt_embeddings=dense_embeddings,
             multimask_output=False,
+            repeat_image=False,
+            high_res_features=None,
         )
 
         logits = F.interpolate(
