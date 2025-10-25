@@ -318,12 +318,10 @@ class SAM2ForwardHelper(ForwardHelperBase):
         self.predictor = predictor.to(device)
         self.predictor.eval()
 
-        self.image_encoder = self.predictor.image_encoder
         self.prompt_encoder = self.predictor.sam_prompt_encoder
         self.mask_decoder = self.predictor.sam_mask_decoder
 
         # 确保子模块位于正确设备
-        self.image_encoder.to(device)
         self.prompt_encoder.to(device)
         self.mask_decoder.to(device)
 
@@ -344,13 +342,13 @@ class SAM2ForwardHelper(ForwardHelperBase):
 
         normalized = (image_tensor - self.mean) / self.std
 
-        backbone_raw = self.image_encoder(normalized)
+        backbone_out = self.predictor.forward_image(normalized)
         (
             backbone_out,
             current_vision_feats,
             current_vision_pos_embeds,
             feat_sizes,
-        ) = self.predictor._prepare_backbone_features(backbone_raw)
+        ) = self.predictor._prepare_backbone_features(backbone_out)
 
         reshaped_feats: list[torch.Tensor] = [
             self._reshape_feature(feat, H, W) for feat, (H, W) in zip(current_vision_feats, feat_sizes)
