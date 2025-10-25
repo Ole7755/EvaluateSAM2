@@ -357,6 +357,14 @@ class SAM2ForwardHelper(ForwardHelperBase):
         ]
 
         target_hw = self.predictor.sam_image_embedding_size
+        if not hasattr(self, "_debug_logged"):
+            debug_info = {
+                "target_hw": target_hw,
+                "feat_sizes": feat_sizes,
+                "reshaped_shapes": [tuple(t.shape) for t in reshaped_feats],
+            }
+            print("[DEBUG] SAM2ForwardHelper feature summary:", debug_info)
+            self._debug_logged = True
 
         backbone_features = None
         high_res_candidates: list[torch.Tensor] = []
