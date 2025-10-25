@@ -385,6 +385,16 @@ class SAM2ForwardHelper(ForwardHelperBase):
         point_inputs = self._prepare_point_inputs(prompt_points)
         mask_inputs = self._prepare_mask_inputs(prompt_mask)
 
+        target_hw = self.predictor.sam_image_embedding_size
+        if backbone_features.ndim != 4:
+            raise ValueError(f"backbone_features 维度异常：{backbone_features.shape}")
+        if backbone_features.size(2) != target_hw:
+            backbone_features = F.interpolate(
+                backbone_features,
+                size=(target_hw, target_hw),
+                mode="nearest",
+            )
+
         sam_outputs = self.predictor._forward_sam_heads(
             backbone_features=backbone_features,
             point_inputs=point_inputs,
