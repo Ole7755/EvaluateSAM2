@@ -330,7 +330,6 @@ class SAM2ForwardHelper(ForwardHelperBase):
         self.device = device
         self.mean = IMAGENET_MEAN.to(device)
         self.std = IMAGENET_STD.to(device)
-        self.dense_pe = self.prompt_encoder.get_dense_pe().to(device)
 
     def forward(
         self,
@@ -353,25 +352,26 @@ class SAM2ForwardHelper(ForwardHelperBase):
             feat_sizes,
         ) = self.predictor._prepare_backbone_features(backbone_raw)
 
-        last_feat = current_vision_feats[-1]
-        H, W = feat_sizes[-1]
-
-        if last_feat.ndim == 3:
-            batch, tokens, dim = last_feat.shape
-            if tokens != H * W:
-                raise ValueError(
-                    f"无法将视觉特征重排为 {H}x{W}：tokens={tokens}，期望 {H * W}。"
-                )
-            backbone_features = last_feat.transpose(1, 2).contiguous().view(batch, dim, H, W)
-        elif last_feat.ndim == 4:
-            if last_feat.shape[-2:] == (H, W) and last_feat.shape[1] != H:
-                backbone_features = last_feat
-            elif last_feat.shape[1:3] == (H, W):
-                backbone_features = last_feat.permute(0, 3, 1, 2).contiguous()
-            else:
-                raise ValueError(f"无法识别的视觉特征排列：{last_feat.shape}，预期包含 {H}x{W}。")
-        else:
-            raise ValueError(f"不支持的视觉特征维度：{last_feat.shape}")
+        backbone_features = None
+        for feat, (H, W) in zip(current_vision_feats, feat_sizes):
+            if feat.ndim == 4:
+                if feat.shape[-2:] == (H, W):
+                    backbone_features = feat
+                    break
+                if feat.shape[1:3] == (H, W):
+                    backbone_features = feat.permute(0, 3, 1, 2).contiguous()
+                    break
+            elif feat.ndim == 3:
+                batch, tokens, dim = feat.shape
+                if tokens == H * W:
+                    backbone_features = feat.transpose(1, 2).contiguous().view(batch, dim, H, W)
+                    break
+        if backbone_features is None:
+            shapes = ", ".join(str(tuple(f.shape)) for f in current_vision_feats)
+            raise ValueError(
+                "未能根据 feat_sizes 重建视觉特征。"
+                f" feat_sizes={feat_sizes}, current_vision_feats={shapes}"
+            )
 
         point_inputs = self._prepare_point_inputs(prompt_points)
         mask_inputs = self._prepare_mask_inputs(prompt_mask)
