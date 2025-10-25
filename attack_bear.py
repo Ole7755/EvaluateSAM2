@@ -70,6 +70,7 @@ out_dir = Path("outputs/bear")
 out_dir.mkdir(parents=True, exist_ok=True)
 
 for obj_id, mask in zip(object_ids_list, masks_list):
+    mask = mask.squeeze()
     mask_u8 = (mask > 0.5).to(torch.uint8).cpu().numpy() * 255
     Image.fromarray(mask_u8).save(out_dir / f"{frame_idx:05d}_id{obj_id}.png")
 
@@ -77,5 +78,6 @@ for frame_idx, object_ids, masks in predictor.propagate_in_video(state):
     object_ids_list = normalize_object_ids(object_ids)
     masks_list = normalize_masks(masks)
     for obj_id, mask in zip(object_ids_list, masks_list):
+        mask = mask.squeeze()
         mask_u8 = (mask > 0.5).to(torch.uint8).cpu().numpy() * 255
         Image.fromarray(mask_u8).save(out_dir / f"{frame_idx:05d}_id{obj_id}.png")
