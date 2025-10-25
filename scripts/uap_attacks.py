@@ -382,18 +382,33 @@ class SAM2ForwardHelper(ForwardHelperBase):
         """
         根据输入提示生成稀疏 / 稠密提示向量。
 
-        目前仅实现掩码提示，后续可扩展点与框。
+        目前支持掩码提示；点与框后续可扩展。
         """
-        if prompt_mask is None:
-            dense_embeddings = None
-        else:
-            mask = prompt_mask
-            if mask.ndim == 3:
-                mask = mask.unsqueeze(1)
-            dense_embeddings = self.prompt_encoder.mask_downscaling(mask.to(self.device))
+        points_tuple = None
+        if prompt_points is not None:
+            if prompt_points.ndim == 2:
+                prompt_points = prompt_points.unsqueeze(0)
+            coords = prompt_points[..., :2].to(self.device)
+            labels = prompt_points[..., 2].to(self.device)
+            points_tuple = (coords, labels)
 
-        sparse_embeddings = None  # 暂不处理点 / 框提示
-        if prompt_points is not None or prompt_boxes is not None:
-            raise NotImplementedError("当前实现仅支持掩码提示。")
+        boxes_tensor = None
+        if prompt_boxes is not None:
+            boxes_tensor = prompt_boxes.to(self.device)
+            if boxes_tensor.ndim == 2:
+                boxes_tensor = boxes_tensor.unsqueeze(0)
 
+        mask_tensor = None
+        if prompt_mask is not None:
+            mask_tensor = prompt_mask.to(self.device)
+            if mask_tensor.ndim == 3:
+                mask_tensor = mask_tensor.unsqueeze(1)
+            elif mask_tensor.ndim == 4 and mask_tensor.shape[1] != 1:
+                raise ValueError("掩码提示张量应为 [B, 1, H, W] 格式。")
+
+        sparse_embeddings, dense_embeddings = self.prompt_encoder.forward(
+            points=points_tuple,
+            boxes=boxes_tensor,
+            masks=mask_tensor,
+        )
         return sparse_embeddings, dense_embeddings
