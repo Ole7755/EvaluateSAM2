@@ -315,14 +315,17 @@ class SAM2ForwardHelper(ForwardHelperBase):
     """
 
     def __init__(self, predictor, device: torch.device) -> None:
-        self.predictor = predictor
-        self.model = predictor.model
-        self.model.to(device)
-        self.model.eval()
+        self.predictor = predictor.to(device)
+        self.predictor.eval()
 
-        self.image_encoder = self.model.image_encoder
-        self.prompt_encoder = self.model.sam_prompt_encoder
-        self.mask_decoder = self.model.sam_mask_decoder
+        self.image_encoder = self.predictor.image_encoder
+        self.prompt_encoder = self.predictor.sam_prompt_encoder
+        self.mask_decoder = self.predictor.sam_mask_decoder
+
+        # 确保子模块位于正确设备
+        self.image_encoder.to(device)
+        self.prompt_encoder.to(device)
+        self.mask_decoder.to(device)
 
         self.device = device
         self.mean = IMAGENET_MEAN.to(device)

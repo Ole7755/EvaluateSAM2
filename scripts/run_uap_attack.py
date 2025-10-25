@@ -26,7 +26,6 @@ from scripts.sam2_attack_utils import (
     AttackLogger,
     AttackSummary,
     compute_perturbation_norms,
-    denormalize_image,
     eval_masks_numpy,
     load_mask_tensor,
     load_rgb_tensor,
@@ -246,10 +245,8 @@ def main() -> None:
     logger.save_tensor(perturbation.squeeze(0), name=f"{sequence}_{args.attack}_uap")
 
     # 保存攻前 / 攻后图像和预测掩码
-    clean_vis = denormalize_image(clean_input)
-    adv_vis = denormalize_image(adv_input)
-    clean_vis = F.interpolate(clean_vis, size=origin_hw, mode="bilinear", align_corners=False).squeeze(0)
-    adv_vis = F.interpolate(adv_vis, size=origin_hw, mode="bilinear", align_corners=False).squeeze(0)
+    clean_vis = F.interpolate(clean_input, size=origin_hw, mode="bilinear", align_corners=False).squeeze(0)
+    adv_vis = F.interpolate(adv_input, size=origin_hw, mode="bilinear", align_corners=False).squeeze(0)
 
     save_rgb_tensor(clean_vis, attack_dir / f"{frame_token}_clean.png")
     save_rgb_tensor(adv_vis, attack_dir / f"{frame_token}_adv.png")
