@@ -108,6 +108,7 @@ def save_masks(
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     for obj_id, mask_tensor in zip(object_ids, masks):
+        mask_tensor = mask_tensor.squeeze()
         mask_u8 = (mask_tensor > 0.5).to(torch.uint8).cpu().numpy() * 255
         save_path = output_dir / f"{frame_idx:05d}_id{obj_id}.png"
         Image.fromarray(mask_u8).save(save_path)
