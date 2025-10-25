@@ -1,3 +1,8 @@
+"""使用首帧掩码初始化 SAM2 并在 DAVIS 数据集上进行多目标传播。"""
+
+from __future__ import annotations
+
+import argparse
 import os
 from pathlib import Path
 from typing import Iterable, Sequence
@@ -15,30 +20,83 @@ DATA_ROOT = PROJECT_ROOT / "data" / "DAVIS"
 OUTPUT_ROOT = PROJECT_ROOT / "outputs"
 
 
-def load_mask_tensor(mask_path: Path) -> torch.Tensor:
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="基于首帧掩码初始化 SAM2，并传播预测整段视频（支持多目标）。"
+    )
+    parser.add_argument("--sequence", type=str, required=True, help="DAVIS 序列名称。")
+    parser.add_argument(
+        "--resolution",
+        type=str,
+        default="480p",
+        help="帧分辨率子目录，例如 480p、Full-Resolution。",
+    )
+    parser.add_argument(
+        "--mask-subdir",
+        type=str,
+        default="Annotations_unsupervised",
+        help="掩码根目录，默认使用无监督标注，可切换为 Annotations。",
+    )
+    parser.add_argument(
+        "--frame-token",
+        type=str,
+        default="00000",
+        help="初始化所使用的首帧编号。",
+    )
+    parser.add_argument(
+        "--max-objects",
+        type=int,
+        default=None,
+        help="限制传播的对象数量（按照标签排序后截断），默认跟随掩码全部对象。",
+    )
+    parser.add_argument(
+        "--data-root",
+        type=Path,
+        default=DATA_ROOT,
+        help="DAVIS 数据根目录。",
+    )
+    parser.add_argument(
+        "--output-root",
+        type=Path,
+        default=OUTPUT_ROOT,
+        help="预测结果输出根目录。",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="打印更详细的掩码统计信息。",
+    )
+    return parser.parse_args()
+
+
+def load_mask_tensor(mask_path: Path, verbose: bool = False) -> torch.Tensor:
     mask = np.array(Image.open(mask_path))
-    print(mask.dtype)
-    print(f"掩码最大值: {mask.max()}, 掩码最小值: {mask.min()}")
+    if verbose:
+        print(f"[INFO] 载入掩码：{mask_path}")
+        print(f"       dtype={mask.dtype}, min={mask.min()}, max={mask.max()}, shape={mask.shape}")
     if mask.ndim == 3:
-        print(f"mask.ndim = {mask.ndim}，使用第 0 通道")
+        if verbose:
+            print("       mask 为多通道，使用第 0 通道。")
         mask = mask[..., 0]
     return torch.from_numpy(mask.astype(np.int64))
 
 
-def extract_instance_masks(mask_tensor: torch.Tensor) -> list[tuple[int, torch.Tensor]]:
+def extract_instance_masks(mask_tensor: torch.Tensor, verbose: bool = False) -> list[tuple[int, torch.Tensor]]:
     mask_np = mask_tensor.numpy()
     unique_labels = [int(v) for v in np.unique(mask_np) if v != 0]
     unique_labels.sort()
     if not unique_labels:
         raise ValueError("未在首帧掩码中检测到任何前景标签。")
 
-    print(f"检测到的对象标签: {unique_labels}")
+    if verbose:
+        print(f"[INFO] 检测到的前景标签：{unique_labels}")
     instances: list[tuple[int, torch.Tensor]] = []
     for obj_index, label_value in enumerate(unique_labels, start=1):
         binary = (mask_tensor == label_value).to(torch.float32)
         instances.append((obj_index, binary))
-        area = int(binary.sum().item())
-        print(f"obj_id={obj_index} 对应标签 {label_value}，首帧像素面积 {area}")
+        if verbose:
+            area = int(binary.sum().item())
+            print(f"       obj_id={obj_index} 对应标签 {label_value}，首帧像素面积 {area}")
     return instances
 
 
@@ -129,16 +187,20 @@ def sample_points_from_mask(
 
 
 def main() -> None:
-    sequence = "walking"
-    rgb_dir = DATA_ROOT / "JPEGImages" / "480p" / sequence
+    args = parse_args()
+    sequence = args.sequence
+
+    rgb_dir = args.data_root / "JPEGImages" / args.resolution / sequence
     if not rgb_dir.exists():
-        raise FileNotFoundError(f"RGB frames not found at {rgb_dir}")
+        raise FileNotFoundError(f"RGB 帧目录不存在：{rgb_dir}")
 
-    mask_path = DATA_ROOT / "Annotations_unsupervised" / "480p" / sequence / "00000.png"
+    mask_path = (
+        args.data_root / args.mask_subdir / args.resolution / sequence / f"{args.frame_token}.png"
+    )
     if not mask_path.exists():
-        raise FileNotFoundError(f"First-frame mask not found at {mask_path}")
+        raise FileNotFoundError(f"首帧掩码不存在：{mask_path}")
 
-    output_dir = OUTPUT_ROOT / sequence
+    output_dir = args.output_root / sequence
 
     if not CONFIG_PATH.exists():
         raise FileNotFoundError(f"未找到 SAM2 配置文件：{CONFIG_PATH}")
@@ -150,10 +212,13 @@ def main() -> None:
     predictor = build_sam2_video_predictor(CONFIG_PATH.name, WEIGHT_PATH.as_posix())
     state = predictor.init_state(rgb_dir.as_posix())
 
-    first_mask = load_mask_tensor(mask_path)
-    instance_masks = extract_instance_masks(first_mask)
-    # 只保留前两个对象
-    instance_masks = instance_masks[:2]
+    first_mask = load_mask_tensor(mask_path, verbose=args.verbose)
+    instance_masks = extract_instance_masks(first_mask, verbose=args.verbose)
+    if args.max_objects is not None:
+        instance_masks = instance_masks[: args.max_objects]
+
+    if args.verbose:
+        print(f"[INFO] 将初始化 {len(instance_masks)} 个对象。")
 
     last_result = None
     for index, (obj_id, instance_mask) in enumerate(instance_masks):
@@ -197,6 +262,8 @@ def main() -> None:
         object_ids_list = normalize_object_ids(object_ids)
         masks_list = normalize_masks(masks)
         save_masks(frame_idx, object_ids_list, masks_list, output_dir)
+
+    print(f"[INFO] 序列 {sequence} 推理完成，结果已保存到：{output_dir}")
 
 
 if __name__ == "__main__":

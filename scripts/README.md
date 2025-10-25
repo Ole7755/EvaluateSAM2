@@ -2,6 +2,19 @@
 
 集中存放所有可执行脚本，例如分割流程（`segment_video_with_first_mask.py`）、单目标实验（`attack_bear.py`）和评估工具（`evaluate_sam2_metrics.py`）。运行脚本前请确认所需配置、权重和数据路径均指向项目根目录下的对应文件夹。
 
+## 多目标首帧传播
+
+- `segment_video_with_first_mask.py`：从指定序列的首帧掩码初始化对象，并传播整段视频的预测掩码。支持通过参数选择分辨率、掩码目录及对象数量：
+  ```bash
+  python -m scripts.segment_video_with_first_mask \
+    --sequence koala \
+    --resolution 480p \
+    --mask-subdir Annotations_unsupervised \
+    --max-objects 3 \
+    --verbose
+  ```
+  输出默认保存在 `outputs/<sequence>/`，掩码命名格式为 `frame_id_id<number>.png`。
+
 ## 新增：通用扰动攻击脚本
 
 - `run_uap_attack.py`：在首帧上对 SAM2 施加 FGSM / PGD / BIM / C&W 攻击，生成通用扰动（UAP），并保存攻前攻后预测、扰动张量及指标日志。  
