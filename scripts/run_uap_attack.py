@@ -237,6 +237,7 @@ def main() -> None:
 
     # 计算扰动范数并写入日志
     perturbation_norms = compute_perturbation_norms(perturbation)
+    delta_iou = clean_iou - adv_iou
 
     clean_vis = (
         F.interpolate(clean_input, size=origin_hw, mode="bilinear", align_corners=False)
@@ -282,15 +283,25 @@ def main() -> None:
         "adv": adv_image_path,
         "perturbation": perturbation_image_path,
     }
-    tracker_update = tracker.update(summary, artifacts, attack_name=args.attack, score=adv_iou)
-    if tracker_update["best"]:
+    tracker_update = tracker.update(summary, artifacts, attack_name=args.attack)
+    if tracker_update.get("skipped"):
         print(
-            f"[INFO] 当前结果刷新最佳攻击案例 (adv_iou={adv_iou:.6f})，已保存至 {tracker.best_root / args.attack}"
+            f"[INFO] clean_iou={clean_iou:.6f} 低于 BestWorstTracker 阈值 {tracker.min_clean_iou:.2f}，"
+            "跳过最佳/最差案例更新。"
         )
-    if tracker_update["worst"]:
-        print(
-            f"[INFO] 当前结果刷新最差攻击案例 (adv_iou={adv_iou:.6f})，已保存至 {tracker.worst_root / args.attack}"
-        )
+    else:
+        if tracker_update["best"]:
+            print(
+                "[INFO] 当前结果刷新最佳攻击案例 "
+                f"(clean_iou={clean_iou:.6f}, adv_iou={adv_iou:.6f}, ΔIoU={delta_iou:.6f})，"
+                f"已保存至 {tracker.best_root / args.attack}"
+            )
+        if tracker_update["worst"]:
+            print(
+                "[INFO] 当前结果刷新最差攻击案例 "
+                f"(clean_iou={clean_iou:.6f}, adv_iou={adv_iou:.6f}, ΔIoU={delta_iou:.6f})，"
+                f"已保存至 {tracker.worst_root / args.attack}"
+            )
 
     mask_dir = attack_dir / "masks"
     mask_dir.mkdir(parents=True, exist_ok=True)
@@ -312,6 +323,7 @@ def main() -> None:
         "uap_linf": perturbation_norms["linf"],
         "uap_l2": perturbation_norms["l2"],
         "uap_l1": perturbation_norms["l1"],
+        "delta_iou": delta_iou,
     }
     report_path = attack_dir / f"{frame_token}_{args.attack}_metrics.json"
     with report_path.open("w", encoding="utf-8") as f:

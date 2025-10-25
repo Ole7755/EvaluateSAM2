@@ -288,11 +288,18 @@ class AttackLogger:
 class BestWorstTracker:
     """维护同一攻击类型下最佳 / 最差案例，并保存相关图像。"""
 
-    def __init__(self, record_path: Path, best_dir: Path, worst_dir: Path) -> None:
+    def __init__(
+        self,
+        record_path: Path,
+        best_dir: Path,
+        worst_dir: Path,
+        min_clean_iou: float = 0.5,
+    ) -> None:
         self.record_path = record_path
         self.best_root = ensure_dir(best_dir)
         self.worst_root = ensure_dir(worst_dir)
         self.state = self._load_state()
+        self.min_clean_iou = float(min_clean_iou)
 
     def _load_state(self) -> Dict[str, Dict[str, Any]]:
         if self.record_path.exists():
@@ -324,16 +331,19 @@ class BestWorstTracker:
         summary: AttackSummary,
         artifacts: Dict[str, Path],
         attack_name: Optional[str] = None,
-        score: Optional[float] = None,
     ) -> Dict[str, bool]:
         attack_key = attack_name or summary.attack_name
         container = self.state.setdefault(attack_key, {"best": None, "worst": None})
-        score_value = summary.adv_iou if score is None else score
+
+        if summary.clean_iou < self.min_clean_iou:
+            return {"best": False, "worst": False, "skipped": True}
+
+        score_value = summary.clean_iou - summary.adv_iou
 
         best_updated = False
         worst_updated = False
 
-        if container["best"] is None or score_value < container["best"]["score"]:
+        if container["best"] is None or score_value > container["best"]["score"]:
             best_updated = True
             container["best"] = self._store_record(
                 summary,
@@ -343,7 +353,7 @@ class BestWorstTracker:
                 existing=container["best"],
             )
 
-        if container["worst"] is None or score_value > container["worst"]["score"]:
+        if container["worst"] is None or score_value < container["worst"]["score"]:
             worst_updated = True
             container["worst"] = self._store_record(
                 summary,
@@ -356,7 +366,7 @@ class BestWorstTracker:
         if best_updated or worst_updated:
             self._save_state()
 
-        return {"best": best_updated, "worst": worst_updated}
+        return {"best": best_updated, "worst": worst_updated, "skipped": False}
 
     def _store_record(
         self,
@@ -382,6 +392,8 @@ class BestWorstTracker:
 
         record = {
             "score": score,
+            "clean_iou": summary.clean_iou,
+            "adv_iou": summary.adv_iou,
             "summary": asdict(summary),
             "artifacts": stored_paths,
         }
