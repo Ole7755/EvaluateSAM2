@@ -1,67 +1,81 @@
-import torch
-from sam2.build_sam import build_sam2_video_predictor
 from pathlib import Path
+from typing import Iterable, Sequence
+
 import numpy as np
+import torch
 from PIL import Image
 
-    
+from sam2.build_sam import build_sam2_video_predictor
+
+
+def load_binary_mask(mask_path: Path) -> torch.Tensor:
+    mask = np.array(Image.open(mask_path))
+    if mask.ndim == 3:
+        mask = mask[..., 0]
+    binary = (mask > 0).astype(np.float32)
+    return torch.from_numpy(binary)
+
+
+def normalize_object_ids(object_ids: Iterable) -> list[int]:
+    if isinstance(object_ids, torch.Tensor):
+        if object_ids.ndim == 0:
+            return [int(object_ids.item())]
+        return [int(item) for item in object_ids.cpu().tolist()]
+    return [int(item) for item in object_ids]
+
+
+def normalize_masks(masks: torch.Tensor | Sequence[torch.Tensor]) -> list[torch.Tensor]:
+    if isinstance(masks, torch.Tensor):
+        if masks.ndim == 2:
+            return [masks]
+        return [masks[idx] for idx in range(masks.shape[0])]
+    return [torch.as_tensor(mask) for mask in masks]
+
+
 check_point = "sam2_hiera_small.pt"
 model_cfg = "sam2_hiera_s.yaml"
-predictor = build_sam2_video_predictor(model_cfg,check_point)
+predictor = build_sam2_video_predictor(model_cfg, check_point)
 
 seq = "bear"
 rgb_dir = Path("DAVIS/JPEGImages/480p/bear")
 ann_dir = Path("DAVIS/Annotations_unsupervised/480p/bear")
 
-# 转成“POSIX 风格”的字符串路径，也就是用正斜杠 / 分隔的形式
 state = predictor.init_state(rgb_dir.as_posix())
 
-first_mask = np.array(Image.open(ann_dir / "00000.png"))
+mask_tensor = load_binary_mask(ann_dir / "00000.png")
 
-# np.nonzero(a)返回数组 a 中“非零元素”的索引位置。
-# 对二维数组，它返回两个一维数组：(行索引数组, 列索引数组)。
+if hasattr(predictor, "add_new_mask"):
+    try:
+        initial = predictor.add_new_mask(
+            state,
+            frame_idx=0,
+            obj_id=1,
+            mask=mask_tensor,
+        )
+    except TypeError:
+        initial = predictor.add_new_mask(
+            state,
+            frame_idx=0,
+            obj_id=1,
+            mask_tensor=mask_tensor,
+        )
+else:
+    raise RuntimeError("当前 SAM2 版本缺少 add_new_mask 接口，无法直接使用掩码提示。")
 
-# ys 是所有前景像素的行坐标（y 坐标）
-# xs 是所有前景像素的列坐标（x 坐标）
-ys,xs = np.nonzero(first_mask)
+frame_idx, object_ids, masks = initial
+object_ids_list = normalize_object_ids(object_ids)
+masks_list = normalize_masks(masks)
 
-# fg_point 是一个形状为 (1, 2) 的点坐标数组，表示前景提示点
-fg_point = np.array([[xs.mean(), ys.mean()]], dtype=np.float32)
-
-bg_x = max(int(xs.min()) - 10, 0)
-bg_y = max(int(ys.min()) - 10, 0)
-bg_point = np.array([[bg_x, bg_y]], dtype=np.float32)
-
-points = np.concatenate([fg_point,bg_point],axis=0)
-labels = np.array([1,0],dtype=np.int32)
-
-"""
-frame_idx: 当前即时分割所对应的帧索引（int，通常等于你传入的那个 frame_idx）。
-  - object_ids: 本帧里已被追踪/存在结果的对象 ID 列表或张量（按位置与 masks 对齐）。注意这是“对象 ID”，不是张量索引；位置 k 与 masks[k] 一一对应。
-  - masks: 当前帧上各对象的分割结果，按 object_ids 的顺序堆叠。常见为 torch.Tensor，形状约为 [K, H, W]（单目标时也可能直接是 [H, W] 或 [1, H, W]），值为 0/1 或概率。保存时需要
-    先 .cpu() 再转 numpy，并做阈值/类型转换。
-
-"""
-
-# 在指定帧上为某个对象添加交互式提示（正/负点或框），并立刻返回该帧的分割结果。
-frame_idx,object_ids,masks = predictor.add_new_points_or_box(
-    state,
-    frame_idx = 0,
-    obj_id = 1,
-    points = points,
-    labels = labels,
-    clear_old_points = True,
-    normalize_coords = False
-)
 out_dir = Path("outputs/bear")
 out_dir.mkdir(parents=True, exist_ok=True)
 
-# 把你已添加的提示（点/框/已有 mask）从某一帧“传播”到整段视频，顺序地为每一帧生成该对象的分割结果
-for frame_idx, object_ids,masks in predictor.propagate_in_video(state):
+for obj_id, mask in zip(object_ids_list, masks_list):
+    mask_u8 = (mask > 0.5).to(torch.uint8).cpu().numpy() * 255
+    Image.fromarray(mask_u8).save(out_dir / f"{frame_idx:05d}_id{obj_id}.png")
 
-    obj_id = int(object_ids[0]) if hasattr(object_ids, "__len__") else int(object_ids)
-    mask_t = masks.squeeze()
-    # 转为 uint8 的 0/255 图像再保存
-    mask_u8 = (mask_t > 0.5).to(torch.uint8).cpu().numpy() * 255
-    save_path = out_dir / f"{frame_idx:05d}.png"
-    Image.fromarray(mask_u8).save(save_path)
+for frame_idx, object_ids, masks in predictor.propagate_in_video(state):
+    object_ids_list = normalize_object_ids(object_ids)
+    masks_list = normalize_masks(masks)
+    for obj_id, mask in zip(object_ids_list, masks_list):
+        mask_u8 = (mask > 0.5).to(torch.uint8).cpu().numpy() * 255
+        Image.fromarray(mask_u8).save(out_dir / f"{frame_idx:05d}_id{obj_id}.png")
