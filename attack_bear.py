@@ -11,7 +11,7 @@ predictor = build_sam2_video_predictor(model_cfg,check_point)
 
 seq = "bear"
 rgb_dir = Path("DAVIS/JPEGImages/480p/bear")
-ann_dir = Path("DAVIS/Annotations/480p/bear")
+ann_dir = Path("DAVIS/Annotations_unsupervised/480p/bear")
 
 # 转成“POSIX 风格”的字符串路径，也就是用正斜杠 / 分隔的形式
 state = predictor.init_state(rgb_dir.as_posix())
@@ -60,7 +60,7 @@ out_dir.mkdir(parents=True, exist_ok=True)
 for frame_idx, object_ids,masks in predictor.propagate_in_video(state):
 
     obj_id = int(object_ids[0]) if hasattr(object_ids, "__len__") else int(object_ids)
-    mask_t = masks[0]
+    mask_t = masks.squeeze()
     # 转为 uint8 的 0/255 图像再保存
     mask_u8 = (mask_t > 0.5).to(torch.uint8).cpu().numpy() * 255
     save_path = out_dir / f"{frame_idx:05d}.png"
