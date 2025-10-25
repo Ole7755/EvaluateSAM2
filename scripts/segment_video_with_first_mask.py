@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -144,7 +145,9 @@ def main() -> None:
     if not WEIGHT_PATH.exists():
         raise FileNotFoundError(f"未找到 SAM2 权重文件：{WEIGHT_PATH}")
 
-    predictor = build_sam2_video_predictor(CONFIG_PATH.as_posix(), WEIGHT_PATH.as_posix())
+    os.environ.setdefault("SAM2_CONFIG_DIR", str(CONFIG_PATH.parent))
+
+    predictor = build_sam2_video_predictor(CONFIG_PATH.name, WEIGHT_PATH.as_posix())
     state = predictor.init_state(rgb_dir.as_posix())
 
     first_mask = load_mask_tensor(mask_path)
