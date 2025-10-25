@@ -362,9 +362,18 @@ class SAM2ForwardHelper(ForwardHelperBase):
                     backbone_features = feat.permute(0, 3, 1, 2).contiguous()
                     break
             elif feat.ndim == 3:
-                batch, tokens, dim = feat.shape
-                if tokens == H * W:
+                shape = feat.shape
+                if shape[1] == H * W:  # [B, HW, C]
+                    batch, tokens, dim = shape
                     backbone_features = feat.transpose(1, 2).contiguous().view(batch, dim, H, W)
+                    break
+                if shape[0] == H * W:  # [HW, B, C]
+                    tokens, batch, dim = shape
+                    backbone_features = feat.permute(1, 2, 0).contiguous().view(batch, dim, H, W)
+                    break
+                if shape[2] == H * W:  # [B, C, HW]
+                    batch, dim, tokens = shape
+                    backbone_features = feat.view(batch, dim, H, W)
                     break
         if backbone_features is None:
             shapes = ", ".join(str(tuple(f.shape)) for f in current_vision_feats)
