@@ -352,54 +352,54 @@ class SAM2ForwardHelper(ForwardHelperBase):
             feat_sizes,
         ) = self.predictor._prepare_backbone_features(backbone_raw)
 
-        backbone_features = None
-        for feat, (H, W) in zip(current_vision_feats, feat_sizes):
-            if feat.ndim == 4:
-                if feat.shape[-2:] == (H, W):
-                    backbone_features = feat
-                    break
-                if feat.shape[1:3] == (H, W):
-                    backbone_features = feat.permute(0, 3, 1, 2).contiguous()
-                    break
-            elif feat.ndim == 3:
-                shape = feat.shape
-                if shape[1] == H * W:  # [B, HW, C]
-                    batch, tokens, dim = shape
-                    backbone_features = feat.transpose(1, 2).contiguous().view(batch, dim, H, W)
-                    break
-                if shape[0] == H * W:  # [HW, B, C]
-                    tokens, batch, dim = shape
-                    backbone_features = feat.permute(1, 2, 0).contiguous().view(batch, dim, H, W)
-                    break
-                if shape[2] == H * W:  # [B, C, HW]
-                    batch, dim, tokens = shape
-                    backbone_features = feat.view(batch, dim, H, W)
-                    break
-        if backbone_features is None:
-            shapes = ", ".join(str(tuple(f.shape)) for f in current_vision_feats)
-            raise ValueError(
-                "未能根据 feat_sizes 重建视觉特征。"
-                f" feat_sizes={feat_sizes}, current_vision_feats={shapes}"
-            )
-
-        point_inputs = self._prepare_point_inputs(prompt_points)
-        mask_inputs = self._prepare_mask_inputs(prompt_mask)
+        reshaped_feats: list[torch.Tensor] = [
+            self._reshape_feature(feat, H, W) for feat, (H, W) in zip(current_vision_feats, feat_sizes)
+        ]
 
         target_hw = self.predictor.sam_image_embedding_size
-        if backbone_features.ndim != 4:
-            raise ValueError(f"backbone_features 维度异常：{backbone_features.shape}")
-        if backbone_features.size(2) != target_hw:
+
+        backbone_features = None
+        high_res_candidates: list[torch.Tensor] = []
+        for reshaped, (H, W) in zip(reshaped_feats, feat_sizes):
+            if H == target_hw:
+                backbone_features = reshaped
+            elif H > target_hw:
+                high_res_candidates.append(reshaped)
+
+        if backbone_features is None:
+            if not reshaped_feats:
+                raise ValueError("image encoder 未返回任何特征。")
+            backbone_features = reshaped_feats[-1]
             backbone_features = F.interpolate(
                 backbone_features,
                 size=(target_hw, target_hw),
                 mode="nearest",
             )
 
+        if backbone_features.ndim != 4:
+            raise ValueError(f"backbone_features 维度异常：{backbone_features.shape}")
+        if backbone_features.size(-1) != target_hw:
+            backbone_features = F.interpolate(
+                backbone_features,
+                size=(target_hw, target_hw),
+                mode="nearest",
+            )
+
+        if len(high_res_candidates) >= 2:
+            high_res_features = (high_res_candidates[0], high_res_candidates[1])
+        elif len(high_res_candidates) == 1:
+            high_res_features = (high_res_candidates[0], high_res_candidates[0])
+        else:
+            high_res_features = None
+
+        point_inputs = self._prepare_point_inputs(prompt_points)
+        mask_inputs = self._prepare_mask_inputs(prompt_mask)
+
         sam_outputs = self.predictor._forward_sam_heads(
             backbone_features=backbone_features,
             point_inputs=point_inputs,
             mask_inputs=mask_inputs,
-            high_res_features=None,
+            high_res_features=high_res_features,
             multimask_output=False,
         )
 
@@ -410,6 +410,24 @@ class SAM2ForwardHelper(ForwardHelperBase):
         )
         probs = torch.sigmoid(logits)
         return ForwardOutput(logits=logits, probs=probs)
+
+    def _reshape_feature(self, feat: torch.Tensor, H: int, W: int) -> torch.Tensor:
+        if feat.ndim == 4:
+            if feat.shape[-2:] == (H, W):
+                return feat
+            if feat.shape[1:3] == (H, W):
+                return feat.permute(0, 3, 1, 2).contiguous()
+        elif feat.ndim == 3:
+            if feat.shape[1] == H * W:  # [B, HW, C]
+                batch, tokens, dim = feat.shape
+                return feat.transpose(1, 2).contiguous().view(batch, dim, H, W)
+            if feat.shape[0] == H * W:  # [HW, B, C]
+                tokens, batch, dim = feat.shape
+                return feat.permute(1, 2, 0).contiguous().view(batch, dim, H, W)
+            if feat.shape[2] == H * W:  # [B, C, HW]
+                batch, dim, tokens = feat.shape
+                return feat.view(batch, dim, H, W)
+        raise ValueError(f"无法重排特征为 [B, C, {H}, {W}]：shape={tuple(feat.shape)}")
 
     def _prepare_point_inputs(
         self, prompt_points: Optional[torch.Tensor]
