@@ -12,9 +12,8 @@ import sys
 from pathlib import Path
 from typing import Dict, Tuple
 
-import torch
-import torch.nn.functional as F
 import os
+import torch
 
 if __package__ is None:  # pragma: no cover - 兼容直接以 python 执行脚本
     sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -31,8 +30,10 @@ from scripts.sam2_attack_utils import (
     load_mask_tensor,
     load_rgb_tensor,
     mask_to_binary,
+    mask_probs_to_numpy,
     resize_image_tensor,
     resize_mask_tensor,
+    restore_image_tensor,
     save_rgb_tensor,
     save_perturbation_image,
 )
@@ -144,21 +145,6 @@ def build_attack(args: argparse.Namespace) -> Tuple[object, AttackConfig]:
     return attack, config
 
 
-def tensor_to_numpy_mask(tensor: torch.Tensor, size_hw: Tuple[int, int], threshold: float) -> torch.Tensor:
-    """
-    将概率张量转换为指定尺寸的二值掩码。
-
-    参数：
-        tensor: shape=(1,1,H,W) 的概率图。
-        size_hw: 目标尺寸 (H, W)。
-        threshold: 二值化阈值。
-    """
-    prob = tensor.detach()
-    binary = (prob > threshold).float()
-    resized = F.interpolate(binary, size=size_hw, mode="nearest")
-    return resized.squeeze(0).squeeze(0).cpu().numpy().astype(bool)
-
-
 def main() -> None:
     args = parse_args()
     ensure_prerequisites()
@@ -180,21 +166,16 @@ def main() -> None:
     if not mask_path.exists():
         raise FileNotFoundError(f"未找到首帧掩码：{mask_path}")
 
-    # 载入图像与掩码
+    # 载入图像与掩码，并按官方预处理缩放 + 填充
     image_tensor = load_rgb_tensor(frame_path, device=device)
-    origin_hw = image_tensor.shape[-2:]
-    resized_image = resize_image_tensor(image_tensor, args.input_size)
+    origin_hw = tuple(image_tensor.shape[-2:])
+    resized_image, resize_info = resize_image_tensor(image_tensor, args.input_size)
 
     raw_mask = load_mask_tensor(mask_path, device=device)
     binary_mask = mask_to_binary(raw_mask, label=args.gt_label)
-    resized_mask = resize_mask_tensor(binary_mask, args.input_size)
-    if resized_mask.ndim == 2:
-        resized_mask = resized_mask.unsqueeze(0).unsqueeze(0)
-    elif resized_mask.ndim == 3:
-        resized_mask = resized_mask.unsqueeze(0)
-    resized_mask = resized_mask.to(device)
+    resized_mask = resize_mask_tensor(binary_mask, resize_info).to(device)
 
-    gt_mask_numpy = mask_to_binary(raw_mask, label=args.gt_label).cpu().numpy().astype(bool)
+    gt_mask_numpy = binary_mask.detach().cpu().numpy().astype(bool)
 
     # 构建预测器与前向辅助
     predictor = build_sam2_video_predictor(CONFIG_PATH.name, WEIGHT_PATH.as_posix())
@@ -218,7 +199,7 @@ def main() -> None:
     # 计算干净样本的预测，用于基线指标
     clean_output = helper.forward(clean_input, prompt_mask=resized_mask)
     clean_probs = clean_output.probs
-    clean_mask_np = tensor_to_numpy_mask(clean_probs, origin_hw, args.mask_threshold)
+    clean_mask_np = mask_probs_to_numpy(clean_probs, resize_info, origin_hw, args.mask_threshold)
     clean_iou, clean_dice = eval_masks_numpy(clean_mask_np, gt_mask_numpy)
 
     # 执行攻击生成通用扰动
@@ -232,28 +213,16 @@ def main() -> None:
 
     adv_output = helper.forward(adv_input, prompt_mask=resized_mask)
     adv_probs = adv_output.probs
-    adv_mask_np = tensor_to_numpy_mask(adv_probs, origin_hw, args.mask_threshold)
+    adv_mask_np = mask_probs_to_numpy(adv_probs, resize_info, origin_hw, args.mask_threshold)
     adv_iou, adv_dice = eval_masks_numpy(adv_mask_np, gt_mask_numpy)
 
     # 计算扰动范数并写入日志
     perturbation_norms = compute_perturbation_norms(perturbation)
     delta_iou = clean_iou - adv_iou
 
-    clean_vis = (
-        F.interpolate(clean_input, size=origin_hw, mode="bilinear", align_corners=False)
-        .squeeze(0)
-        .detach()
-    )
-    adv_vis = (
-        F.interpolate(adv_input, size=origin_hw, mode="bilinear", align_corners=False)
-        .squeeze(0)
-        .detach()
-    )
-    perturbation_vis = (
-        F.interpolate(perturbation, size=origin_hw, mode="bilinear", align_corners=False)
-        .squeeze(0)
-        .detach()
-    )
+    clean_vis = restore_image_tensor(clean_input, resize_info, origin_hw).squeeze(0).detach()
+    adv_vis = restore_image_tensor(adv_input, resize_info, origin_hw).squeeze(0).detach()
+    perturbation_vis = restore_image_tensor(perturbation, resize_info, origin_hw).squeeze(0).detach()
 
     clean_image_path = attack_dir / f"{frame_token}_clean.png"
     adv_image_path = attack_dir / f"{frame_token}_adv.png"

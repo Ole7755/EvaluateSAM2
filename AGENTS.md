@@ -49,9 +49,4 @@
 
 问题记录
 ------
-- 2025-??-??：`python -m scripts.run_uap_attack --sequence bear --attack fgsm --epsilon 0.03 --gt-label 1 --device cuda` 运行失败，报错：
-  ```
-  RuntimeError: The size of tensor a (32) must match the size of tensor b (256) at non-singleton dimension 1
-  ```
--  定位在 `sam2/modeling/sam/mask_decoder.py` 的 `predict_masks` 函数。正在排查高分辨率特征与解码器输入对齐问题。
--  2025-10-26：通过调用预测器自带的 `forward_image` 获取投影后的 FPN 特征并补充高分辨率分支输入，问题已解决。
+- 2025-10-26：通过调用预测器自带的 `forward_image` 获取投影后的 FPN 特征并补充高分辨率分支输入，问题已解决。
