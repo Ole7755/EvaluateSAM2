@@ -1,0 +1,18 @@
+{
+  "attack_name": "fgsm",
+  "sequence": "sheep",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9718482252141983,
+  "clean_dice": 0.9857231533209186,
+  "adv_iou": 0.053214752197713495,
+  "adv_dice": 0.10105204486866858,
+  "perturbation_norm": {
+    "l2": 53.195526123046875,
+    "linf": 0.030000001192092896,
+    "l1": 94339.703125
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/sheep/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/sheep/00000.png"
+}

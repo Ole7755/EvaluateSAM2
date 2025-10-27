@@ -1,0 +1,56 @@
+{
+  "bim": {
+    "best": {
+      "score": 0.9914101154480484,
+      "clean_iou": 0.9914101154480484,
+      "adv_iou": 0.0,
+      "summary": {
+        "attack_name": "bim",
+        "sequence": "dancing",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9914101154480484,
+        "clean_dice": 0.9956865316263501,
+        "adv_iou": 0.0,
+        "adv_dice": 0.0,
+        "perturbation_norm": {
+          "l2": 34.878543853759766,
+          "linf": 0.030000001192092896,
+          "l1": 52114.85546875
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/dancing/bim/best_cases/bim/bim_dancing_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/dancing/bim/best_cases/bim/bim_dancing_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/dancing/bim/best_cases/bim/bim_dancing_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9914101154480484,
+      "clean_iou": 0.9914101154480484,
+      "adv_iou": 0.0,
+      "summary": {
+        "attack_name": "bim",
+        "sequence": "dancing",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9914101154480484,
+        "clean_dice": 0.9956865316263501,
+        "adv_iou": 0.0,
+        "adv_dice": 0.0,
+        "perturbation_norm": {
+          "l2": 34.878543853759766,
+          "linf": 0.030000001192092896,
+          "l1": 52114.85546875
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/dancing/bim/worst_cases/bim/bim_dancing_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/dancing/bim/worst_cases/bim/bim_dancing_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/dancing/bim/worst_cases/bim/bim_dancing_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

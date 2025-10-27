@@ -1,0 +1,56 @@
+{
+  "bim": {
+    "best": {
+      "score": 0.9902097823048707,
+      "clean_iou": 0.9908013444188927,
+      "adv_iou": 0.0005915621140219723,
+      "summary": {
+        "attack_name": "bim",
+        "sequence": "dogs-scale",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9908013444188927,
+        "clean_dice": 0.9953794206504354,
+        "adv_iou": 0.0005915621140219723,
+        "adv_dice": 0.0011824247503589504,
+        "perturbation_norm": {
+          "l2": 35.601715087890625,
+          "linf": 0.030000001192092896,
+          "l1": 54155.484375
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/dogs-scale/bim/best_cases/bim/bim_dogs-scale_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/dogs-scale/bim/best_cases/bim/bim_dogs-scale_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/dogs-scale/bim/best_cases/bim/bim_dogs-scale_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9902097823048707,
+      "clean_iou": 0.9908013444188927,
+      "adv_iou": 0.0005915621140219723,
+      "summary": {
+        "attack_name": "bim",
+        "sequence": "dogs-scale",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9908013444188927,
+        "clean_dice": 0.9953794206504354,
+        "adv_iou": 0.0005915621140219723,
+        "adv_dice": 0.0011824247503589504,
+        "perturbation_norm": {
+          "l2": 35.601715087890625,
+          "linf": 0.030000001192092896,
+          "l1": 54155.484375
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/dogs-scale/bim/worst_cases/bim/bim_dogs-scale_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/dogs-scale/bim/worst_cases/bim/bim_dogs-scale_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/dogs-scale/bim/worst_cases/bim/bim_dogs-scale_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

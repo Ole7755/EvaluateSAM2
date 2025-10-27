@@ -1,0 +1,56 @@
+{
+  "cw": {
+    "best": {
+      "score": 0.9611149654798972,
+      "clean_iou": 0.9743679775280899,
+      "adv_iou": 0.01325301204819277,
+      "summary": {
+        "attack_name": "cw",
+        "sequence": "skate-park",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9743679775280899,
+        "clean_dice": 0.9870176062600036,
+        "adv_iou": 0.01325301204819277,
+        "adv_dice": 0.026159334126040427,
+        "perturbation_norm": {
+          "l2": 2.812079668045044,
+          "linf": 0.0031628012657165527,
+          "l1": 4176.22607421875
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/skate-park/cw/best_cases/cw/cw_skate-park_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/skate-park/cw/best_cases/cw/cw_skate-park_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/skate-park/cw/best_cases/cw/cw_skate-park_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9611149654798972,
+      "clean_iou": 0.9743679775280899,
+      "adv_iou": 0.01325301204819277,
+      "summary": {
+        "attack_name": "cw",
+        "sequence": "skate-park",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9743679775280899,
+        "clean_dice": 0.9870176062600036,
+        "adv_iou": 0.01325301204819277,
+        "adv_dice": 0.026159334126040427,
+        "perturbation_norm": {
+          "l2": 2.812079668045044,
+          "linf": 0.0031628012657165527,
+          "l1": 4176.22607421875
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/skate-park/cw/worst_cases/cw/cw_skate-park_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/skate-park/cw/worst_cases/cw/cw_skate-park_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/skate-park/cw/worst_cases/cw/cw_skate-park_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

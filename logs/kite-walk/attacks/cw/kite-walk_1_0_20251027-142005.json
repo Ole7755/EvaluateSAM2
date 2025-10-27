@@ -1,0 +1,18 @@
+{
+  "attack_name": "cw",
+  "sequence": "kite-walk",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.6461182411108773,
+  "clean_dice": 0.7850204498977505,
+  "adv_iou": 0.13871819989907086,
+  "adv_dice": 0.24363920750782064,
+  "perturbation_norm": {
+    "l2": 3.9525339603424072,
+    "linf": 0.029999971389770508,
+    "l1": 4321.91357421875
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/kite-walk/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/kite-walk/00000.png"
+}

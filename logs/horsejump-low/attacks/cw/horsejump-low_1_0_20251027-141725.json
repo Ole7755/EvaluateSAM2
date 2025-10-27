@@ -1,0 +1,18 @@
+{
+  "attack_name": "cw",
+  "sequence": "horsejump-low",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9794688500062342,
+  "clean_dice": 0.9896279499454103,
+  "adv_iou": 0.15136457586366897,
+  "adv_dice": 0.2629307502363036,
+  "perturbation_norm": {
+    "l2": 5.429026126861572,
+    "linf": 0.029999971389770508,
+    "l1": 6426.53662109375
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/horsejump-low/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/horsejump-low/00000.png"
+}

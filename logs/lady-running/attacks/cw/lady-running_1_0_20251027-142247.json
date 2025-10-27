@@ -1,0 +1,18 @@
+{
+  "attack_name": "cw",
+  "sequence": "lady-running",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9969887280767196,
+  "clean_dice": 0.9984920936803782,
+  "adv_iou": 0.052878767401000136,
+  "adv_dice": 0.10044607040852348,
+  "perturbation_norm": {
+    "l2": 6.483723163604736,
+    "linf": 0.029999971389770508,
+    "l1": 8162.03662109375
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/lady-running/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/lady-running/00000.png"
+}

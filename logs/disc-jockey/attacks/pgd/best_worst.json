@@ -1,0 +1,56 @@
+{
+  "pgd": {
+    "best": {
+      "score": 0.9633906903321882,
+      "clean_iou": 0.9987244817017064,
+      "adv_iou": 0.03533379136951819,
+      "summary": {
+        "attack_name": "pgd",
+        "sequence": "disc-jockey",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9987244817017064,
+        "clean_dice": 0.9993618338545552,
+        "adv_iou": 0.03533379136951819,
+        "adv_dice": 0.06825584495369244,
+        "perturbation_norm": {
+          "l2": 35.057777404785156,
+          "linf": 0.030000001192092896,
+          "l1": 53150.1796875
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/disc-jockey/pgd/best_cases/pgd/pgd_disc-jockey_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/disc-jockey/pgd/best_cases/pgd/pgd_disc-jockey_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/disc-jockey/pgd/best_cases/pgd/pgd_disc-jockey_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9633906903321882,
+      "clean_iou": 0.9987244817017064,
+      "adv_iou": 0.03533379136951819,
+      "summary": {
+        "attack_name": "pgd",
+        "sequence": "disc-jockey",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9987244817017064,
+        "clean_dice": 0.9993618338545552,
+        "adv_iou": 0.03533379136951819,
+        "adv_dice": 0.06825584495369244,
+        "perturbation_norm": {
+          "l2": 35.057777404785156,
+          "linf": 0.030000001192092896,
+          "l1": 53150.1796875
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/disc-jockey/pgd/worst_cases/pgd/pgd_disc-jockey_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/disc-jockey/pgd/worst_cases/pgd/pgd_disc-jockey_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/disc-jockey/pgd/worst_cases/pgd/pgd_disc-jockey_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

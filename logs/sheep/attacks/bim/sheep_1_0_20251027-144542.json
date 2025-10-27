@@ -1,0 +1,18 @@
+{
+  "attack_name": "bim",
+  "sequence": "sheep",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9718482252141983,
+  "clean_dice": 0.9857231533209186,
+  "adv_iou": 0.0,
+  "adv_dice": 0.0,
+  "perturbation_norm": {
+    "l2": 35.76720428466797,
+    "linf": 0.030000001192092896,
+    "l1": 54519.796875
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/sheep/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/sheep/00000.png"
+}

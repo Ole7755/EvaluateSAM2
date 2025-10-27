@@ -1,0 +1,56 @@
+{
+  "pgd": {
+    "best": {
+      "score": 0.9743679775280899,
+      "clean_iou": 0.9743679775280899,
+      "adv_iou": 0.0,
+      "summary": {
+        "attack_name": "pgd",
+        "sequence": "skate-park",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9743679775280899,
+        "clean_dice": 0.9870176062600036,
+        "adv_iou": 0.0,
+        "adv_dice": 0.0,
+        "perturbation_norm": {
+          "l2": 30.3636417388916,
+          "linf": 0.029999971389770508,
+          "l1": 46231.28125
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/skate-park/pgd/best_cases/pgd/pgd_skate-park_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/skate-park/pgd/best_cases/pgd/pgd_skate-park_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/skate-park/pgd/best_cases/pgd/pgd_skate-park_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9743679775280899,
+      "clean_iou": 0.9743679775280899,
+      "adv_iou": 0.0,
+      "summary": {
+        "attack_name": "pgd",
+        "sequence": "skate-park",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9743679775280899,
+        "clean_dice": 0.9870176062600036,
+        "adv_iou": 0.0,
+        "adv_dice": 0.0,
+        "perturbation_norm": {
+          "l2": 30.3636417388916,
+          "linf": 0.029999971389770508,
+          "l1": 46231.28125
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/skate-park/pgd/worst_cases/pgd/pgd_skate-park_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/skate-park/pgd/worst_cases/pgd/pgd_skate-park_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/skate-park/pgd/worst_cases/pgd/pgd_skate-park_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

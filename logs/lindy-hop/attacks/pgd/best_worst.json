@@ -1,0 +1,56 @@
+{
+  "pgd": {
+    "best": {
+      "score": 0.9825916769674495,
+      "clean_iou": 0.9825916769674495,
+      "adv_iou": 0.0,
+      "summary": {
+        "attack_name": "pgd",
+        "sequence": "lindy-hop",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9825916769674495,
+        "clean_dice": 0.9912194108172703,
+        "adv_iou": 0.0,
+        "adv_dice": 0.0,
+        "perturbation_norm": {
+          "l2": 35.71184539794922,
+          "linf": 0.030000001192092896,
+          "l1": 54572.8125
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/lindy-hop/pgd/best_cases/pgd/pgd_lindy-hop_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/lindy-hop/pgd/best_cases/pgd/pgd_lindy-hop_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/lindy-hop/pgd/best_cases/pgd/pgd_lindy-hop_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9825916769674495,
+      "clean_iou": 0.9825916769674495,
+      "adv_iou": 0.0,
+      "summary": {
+        "attack_name": "pgd",
+        "sequence": "lindy-hop",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9825916769674495,
+        "clean_dice": 0.9912194108172703,
+        "adv_iou": 0.0,
+        "adv_dice": 0.0,
+        "perturbation_norm": {
+          "l2": 35.71184539794922,
+          "linf": 0.030000001192092896,
+          "l1": 54572.8125
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/lindy-hop/pgd/worst_cases/pgd/pgd_lindy-hop_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/lindy-hop/pgd/worst_cases/pgd/pgd_lindy-hop_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/lindy-hop/pgd/worst_cases/pgd/pgd_lindy-hop_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

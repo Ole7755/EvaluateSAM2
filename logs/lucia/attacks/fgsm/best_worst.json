@@ -1,0 +1,56 @@
+{
+  "fgsm": {
+    "best": {
+      "score": 0.9479752466863492,
+      "clean_iou": 0.9610938989513823,
+      "adv_iou": 0.013118652265033049,
+      "summary": {
+        "attack_name": "fgsm",
+        "sequence": "lucia",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9610938989513823,
+        "clean_dice": 0.9801610208111803,
+        "adv_iou": 0.013118652265033049,
+        "adv_dice": 0.02589756340129289,
+        "perturbation_norm": {
+          "l2": 53.06591796875,
+          "linf": 0.030000001192092896,
+          "l1": 93968.3359375
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/lucia/fgsm/best_cases/fgsm/fgsm_lucia_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/lucia/fgsm/best_cases/fgsm/fgsm_lucia_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/lucia/fgsm/best_cases/fgsm/fgsm_lucia_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9479752466863492,
+      "clean_iou": 0.9610938989513823,
+      "adv_iou": 0.013118652265033049,
+      "summary": {
+        "attack_name": "fgsm",
+        "sequence": "lucia",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9610938989513823,
+        "clean_dice": 0.9801610208111803,
+        "adv_iou": 0.013118652265033049,
+        "adv_dice": 0.02589756340129289,
+        "perturbation_norm": {
+          "l2": 53.06591796875,
+          "linf": 0.030000001192092896,
+          "l1": 93968.3359375
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/lucia/fgsm/worst_cases/fgsm/fgsm_lucia_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/lucia/fgsm/worst_cases/fgsm/fgsm_lucia_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/lucia/fgsm/worst_cases/fgsm/fgsm_lucia_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

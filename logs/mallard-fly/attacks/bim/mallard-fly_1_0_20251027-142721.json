@@ -1,0 +1,18 @@
+{
+  "attack_name": "bim",
+  "sequence": "mallard-fly",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9834604337922155,
+  "clean_dice": 0.9916612573026414,
+  "adv_iou": 0.01586629768299962,
+  "adv_dice": 0.031236980140374116,
+  "perturbation_norm": {
+    "l2": 24.975975036621094,
+    "linf": 0.02000001072883606,
+    "l1": 31237.00390625
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/mallard-fly/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/mallard-fly/00000.png"
+}

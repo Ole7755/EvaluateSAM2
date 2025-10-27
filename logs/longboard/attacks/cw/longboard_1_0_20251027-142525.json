@@ -1,0 +1,18 @@
+{
+  "attack_name": "cw",
+  "sequence": "longboard",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9883999401287232,
+  "clean_dice": 0.9941661334638112,
+  "adv_iou": 0.2765294303464252,
+  "adv_dice": 0.43325194668074435,
+  "perturbation_norm": {
+    "l2": 5.341267108917236,
+    "linf": 0.029999971389770508,
+    "l1": 7173.673828125
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/longboard/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/longboard/00000.png"
+}

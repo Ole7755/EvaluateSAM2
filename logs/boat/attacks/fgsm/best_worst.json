@@ -1,0 +1,56 @@
+{
+  "fgsm": {
+    "best": {
+      "score": 0.8960170372374243,
+      "clean_iou": 0.9399726081001761,
+      "adv_iou": 0.04395557086275185,
+      "summary": {
+        "attack_name": "fgsm",
+        "sequence": "boat",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9399726081001761,
+        "clean_dice": 0.9690576085202517,
+        "adv_iou": 0.04395557086275185,
+        "adv_dice": 0.08420965813023218,
+        "perturbation_norm": {
+          "l2": 0.0,
+          "linf": 0.0,
+          "l1": 0.0
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/boat/fgsm/best_cases/fgsm/fgsm_boat_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/boat/fgsm/best_cases/fgsm/fgsm_boat_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/boat/fgsm/best_cases/fgsm/fgsm_boat_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.8960170372374243,
+      "clean_iou": 0.9399726081001761,
+      "adv_iou": 0.04395557086275185,
+      "summary": {
+        "attack_name": "fgsm",
+        "sequence": "boat",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9399726081001761,
+        "clean_dice": 0.9690576085202517,
+        "adv_iou": 0.04395557086275185,
+        "adv_dice": 0.08420965813023218,
+        "perturbation_norm": {
+          "l2": 0.0,
+          "linf": 0.0,
+          "l1": 0.0
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/boat/fgsm/worst_cases/fgsm/fgsm_boat_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/boat/fgsm/worst_cases/fgsm/fgsm_boat_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/boat/fgsm/worst_cases/fgsm/fgsm_boat_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

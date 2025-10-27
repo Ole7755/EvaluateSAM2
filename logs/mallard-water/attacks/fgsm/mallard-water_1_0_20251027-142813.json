@@ -1,0 +1,18 @@
+{
+  "attack_name": "fgsm",
+  "sequence": "mallard-water",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9950230583078398,
+  "clean_dice": 0.9975053212185018,
+  "adv_iou": 0.044761331331407625,
+  "adv_dice": 0.08568718996206595,
+  "perturbation_norm": {
+    "l2": 0.0,
+    "linf": 0.0,
+    "l1": 0.0
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/mallard-water/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/mallard-water/00000.png"
+}

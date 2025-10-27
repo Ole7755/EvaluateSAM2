@@ -1,0 +1,18 @@
+{
+  "attack_name": "fgsm",
+  "sequence": "motocross-bumps",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9608239095315024,
+  "clean_dice": 0.9800205973223481,
+  "adv_iou": 0.029667496832262857,
+  "adv_dice": 0.05762539251463974,
+  "perturbation_norm": {
+    "l2": 53.20859146118164,
+    "linf": 0.030000001192092896,
+    "l1": 94371.828125
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/motocross-bumps/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/motocross-bumps/00000.png"
+}

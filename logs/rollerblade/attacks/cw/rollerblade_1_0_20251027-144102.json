@@ -1,0 +1,18 @@
+{
+  "attack_name": "cw",
+  "sequence": "rollerblade",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9884610398029301,
+  "clean_dice": 0.9941970398382995,
+  "adv_iou": 0.01712047295186369,
+  "adv_dice": 0.0336645921641456,
+  "perturbation_norm": {
+    "l2": 5.562067031860352,
+    "linf": 0.029999971389770508,
+    "l1": 6818.2470703125
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/rollerblade/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/rollerblade/00000.png"
+}

@@ -1,0 +1,18 @@
+{
+  "attack_name": "pgd",
+  "sequence": "paragliding",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9370529327610873,
+  "clean_dice": 0.9675036927621861,
+  "adv_iou": 0.0,
+  "adv_dice": 0.0,
+  "perturbation_norm": {
+    "l2": 30.71995735168457,
+    "linf": 0.029999971389770508,
+    "l1": 47190.48046875
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/paragliding/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/paragliding/00000.png"
+}

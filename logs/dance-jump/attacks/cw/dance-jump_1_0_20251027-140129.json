@@ -1,0 +1,18 @@
+{
+  "attack_name": "cw",
+  "sequence": "dance-jump",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9922464622641509,
+  "clean_dice": 0.9961081433031949,
+  "adv_iou": 0.08193864344961468,
+  "adv_dice": 0.15146634043565432,
+  "perturbation_norm": {
+    "l2": 6.701936721801758,
+    "linf": 0.029999971389770508,
+    "l1": 8247.466796875
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/dance-jump/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/dance-jump/00000.png"
+}

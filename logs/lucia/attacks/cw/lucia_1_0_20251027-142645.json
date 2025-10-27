@@ -1,0 +1,18 @@
+{
+  "attack_name": "cw",
+  "sequence": "lucia",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9610938989513823,
+  "clean_dice": 0.9801610208111803,
+  "adv_iou": 0.049923391215526046,
+  "adv_dice": 0.09509911224613887,
+  "perturbation_norm": {
+    "l2": 5.414046287536621,
+    "linf": 0.029999971389770508,
+    "l1": 6427.08251953125
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/lucia/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/lucia/00000.png"
+}

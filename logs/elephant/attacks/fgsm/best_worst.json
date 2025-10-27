@@ -1,0 +1,56 @@
+{
+  "fgsm": {
+    "best": {
+      "score": 0.9691216496376236,
+      "clean_iou": 0.9877403958635534,
+      "adv_iou": 0.01861874622592982,
+      "summary": {
+        "attack_name": "fgsm",
+        "sequence": "elephant",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9877403958635534,
+        "clean_dice": 0.9938323917137476,
+        "adv_iou": 0.01861874622592982,
+        "adv_dice": 0.03655684974366293,
+        "perturbation_norm": {
+          "l2": 53.20627975463867,
+          "linf": 0.030000001192092896,
+          "l1": 94366.703125
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/elephant/fgsm/best_cases/fgsm/fgsm_elephant_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/elephant/fgsm/best_cases/fgsm/fgsm_elephant_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/elephant/fgsm/best_cases/fgsm/fgsm_elephant_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9691216496376236,
+      "clean_iou": 0.9877403958635534,
+      "adv_iou": 0.01861874622592982,
+      "summary": {
+        "attack_name": "fgsm",
+        "sequence": "elephant",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9877403958635534,
+        "clean_dice": 0.9938323917137476,
+        "adv_iou": 0.01861874622592982,
+        "adv_dice": 0.03655684974366293,
+        "perturbation_norm": {
+          "l2": 53.20627975463867,
+          "linf": 0.030000001192092896,
+          "l1": 94366.703125
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/elephant/fgsm/worst_cases/fgsm/fgsm_elephant_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/elephant/fgsm/worst_cases/fgsm/fgsm_elephant_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/elephant/fgsm/worst_cases/fgsm/fgsm_elephant_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

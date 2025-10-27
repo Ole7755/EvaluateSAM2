@@ -1,0 +1,18 @@
+{
+  "attack_name": "pgd",
+  "sequence": "mallard-fly",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9834604337922155,
+  "clean_dice": 0.9916612573026414,
+  "adv_iou": 0.0005101210180713084,
+  "adv_dice": 0.0010197218545920028,
+  "perturbation_norm": {
+    "l2": 30.612823486328125,
+    "linf": 0.030000001192092896,
+    "l1": 46958.91015625
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/mallard-fly/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/mallard-fly/00000.png"
+}

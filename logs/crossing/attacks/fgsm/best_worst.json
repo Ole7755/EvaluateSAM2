@@ -1,0 +1,56 @@
+{
+  "fgsm": {
+    "best": {
+      "score": 0.9748595142219085,
+      "clean_iou": 0.9753694581280788,
+      "adv_iou": 0.0005099439061703213,
+      "summary": {
+        "attack_name": "fgsm",
+        "sequence": "crossing",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9753694581280788,
+        "clean_dice": 0.9875311720698254,
+        "adv_iou": 0.0005099439061703213,
+        "adv_dice": 0.0010193679918450561,
+        "perturbation_norm": {
+          "l2": 52.55707550048828,
+          "linf": 0.030000001192092896,
+          "l1": 92211.5625
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/crossing/fgsm/best_cases/fgsm/fgsm_crossing_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/crossing/fgsm/best_cases/fgsm/fgsm_crossing_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/crossing/fgsm/best_cases/fgsm/fgsm_crossing_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9748595142219085,
+      "clean_iou": 0.9753694581280788,
+      "adv_iou": 0.0005099439061703213,
+      "summary": {
+        "attack_name": "fgsm",
+        "sequence": "crossing",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9753694581280788,
+        "clean_dice": 0.9875311720698254,
+        "adv_iou": 0.0005099439061703213,
+        "adv_dice": 0.0010193679918450561,
+        "perturbation_norm": {
+          "l2": 52.55707550048828,
+          "linf": 0.030000001192092896,
+          "l1": 92211.5625
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/crossing/fgsm/worst_cases/fgsm/fgsm_crossing_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/crossing/fgsm/worst_cases/fgsm/fgsm_crossing_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/crossing/fgsm/worst_cases/fgsm/fgsm_crossing_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

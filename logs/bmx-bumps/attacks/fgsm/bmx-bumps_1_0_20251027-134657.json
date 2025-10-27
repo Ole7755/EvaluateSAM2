@@ -1,0 +1,18 @@
+{
+  "attack_name": "fgsm",
+  "sequence": "bmx-bumps",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9058123920966814,
+  "clean_dice": 0.9505787619526925,
+  "adv_iou": 0.0,
+  "adv_dice": 0.0,
+  "perturbation_norm": {
+    "l2": 53.0563850402832,
+    "linf": 0.030000001192092896,
+    "l1": 93982.359375
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/bmx-bumps/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/bmx-bumps/00000.png"
+}

@@ -1,0 +1,18 @@
+{
+  "attack_name": "cw",
+  "sequence": "schoolgirls",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9866464097233328,
+  "clean_dice": 0.9932783256188368,
+  "adv_iou": 0.10231292217165651,
+  "adv_dice": 0.1856331720580591,
+  "perturbation_norm": {
+    "l2": 4.886685371398926,
+    "linf": 0.029999971389770508,
+    "l1": 5173.56494140625
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/schoolgirls/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/schoolgirls/00000.png"
+}

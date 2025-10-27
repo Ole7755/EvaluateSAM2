@@ -1,0 +1,56 @@
+{
+  "fgsm": {
+    "best": {
+      "score": 0.9867135258125678,
+      "clean_iou": 0.9914101154480484,
+      "adv_iou": 0.0046965896354806,
+      "summary": {
+        "attack_name": "fgsm",
+        "sequence": "dancing",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9914101154480484,
+        "clean_dice": 0.9956865316263501,
+        "adv_iou": 0.0046965896354806,
+        "adv_dice": 0.009349269588313412,
+        "perturbation_norm": {
+          "l2": 51.42171096801758,
+          "linf": 0.030000001192092896,
+          "l1": 88876.515625
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/dancing/fgsm/best_cases/fgsm/fgsm_dancing_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/dancing/fgsm/best_cases/fgsm/fgsm_dancing_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/dancing/fgsm/best_cases/fgsm/fgsm_dancing_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9867135258125678,
+      "clean_iou": 0.9914101154480484,
+      "adv_iou": 0.0046965896354806,
+      "summary": {
+        "attack_name": "fgsm",
+        "sequence": "dancing",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9914101154480484,
+        "clean_dice": 0.9956865316263501,
+        "adv_iou": 0.0046965896354806,
+        "adv_dice": 0.009349269588313412,
+        "perturbation_norm": {
+          "l2": 51.42171096801758,
+          "linf": 0.030000001192092896,
+          "l1": 88876.515625
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/dancing/fgsm/worst_cases/fgsm/fgsm_dancing_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/dancing/fgsm/worst_cases/fgsm/fgsm_dancing_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/dancing/fgsm/worst_cases/fgsm/fgsm_dancing_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

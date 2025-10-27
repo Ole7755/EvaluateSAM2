@@ -1,0 +1,56 @@
+{
+  "cw": {
+    "best": {
+      "score": 0.9860120680197477,
+      "clean_iou": 0.9860120680197477,
+      "adv_iou": 0.0,
+      "summary": {
+        "attack_name": "cw",
+        "sequence": "car-turn",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9860120680197477,
+        "clean_dice": 0.9929567739262533,
+        "adv_iou": 0.0,
+        "adv_dice": 0.0,
+        "perturbation_norm": {
+          "l2": 5.321154594421387,
+          "linf": 0.029999971389770508,
+          "l1": 6124.5751953125
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/car-turn/cw/best_cases/cw/cw_car-turn_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/car-turn/cw/best_cases/cw/cw_car-turn_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/car-turn/cw/best_cases/cw/cw_car-turn_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9860120680197477,
+      "clean_iou": 0.9860120680197477,
+      "adv_iou": 0.0,
+      "summary": {
+        "attack_name": "cw",
+        "sequence": "car-turn",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9860120680197477,
+        "clean_dice": 0.9929567739262533,
+        "adv_iou": 0.0,
+        "adv_dice": 0.0,
+        "perturbation_norm": {
+          "l2": 5.321154594421387,
+          "linf": 0.029999971389770508,
+          "l1": 6124.5751953125
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/car-turn/cw/worst_cases/cw/cw_car-turn_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/car-turn/cw/worst_cases/cw/cw_car-turn_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/car-turn/cw/worst_cases/cw/cw_car-turn_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

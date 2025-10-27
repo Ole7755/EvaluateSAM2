@@ -1,0 +1,56 @@
+{
+  "pgd": {
+    "best": {
+      "score": 0.9889995669120831,
+      "clean_iou": 0.9889995669120831,
+      "adv_iou": 0.0,
+      "summary": {
+        "attack_name": "pgd",
+        "sequence": "flamingo",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9889995669120831,
+        "clean_dice": 0.9944693637590907,
+        "adv_iou": 0.0,
+        "adv_dice": 0.0,
+        "perturbation_norm": {
+          "l2": 35.78525924682617,
+          "linf": 0.030000001192092896,
+          "l1": 54696.49609375
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/flamingo/pgd/best_cases/pgd/pgd_flamingo_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/flamingo/pgd/best_cases/pgd/pgd_flamingo_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/flamingo/pgd/best_cases/pgd/pgd_flamingo_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9889995669120831,
+      "clean_iou": 0.9889995669120831,
+      "adv_iou": 0.0,
+      "summary": {
+        "attack_name": "pgd",
+        "sequence": "flamingo",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9889995669120831,
+        "clean_dice": 0.9944693637590907,
+        "adv_iou": 0.0,
+        "adv_dice": 0.0,
+        "perturbation_norm": {
+          "l2": 35.78525924682617,
+          "linf": 0.030000001192092896,
+          "l1": 54696.49609375
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/flamingo/pgd/worst_cases/pgd/pgd_flamingo_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/flamingo/pgd/worst_cases/pgd/pgd_flamingo_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/flamingo/pgd/worst_cases/pgd/pgd_flamingo_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

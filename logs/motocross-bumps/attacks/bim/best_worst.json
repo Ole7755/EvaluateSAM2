@@ -1,0 +1,56 @@
+{
+  "bim": {
+    "best": {
+      "score": 0.9600682481161789,
+      "clean_iou": 0.9608239095315024,
+      "adv_iou": 0.0007556614153236044,
+      "summary": {
+        "attack_name": "bim",
+        "sequence": "motocross-bumps",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9608239095315024,
+        "clean_dice": 0.9800205973223481,
+        "adv_iou": 0.0007556614153236044,
+        "adv_dice": 0.0015101816446482183,
+        "perturbation_norm": {
+          "l2": 35.59482192993164,
+          "linf": 0.030000001192092896,
+          "l1": 54150.703125
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/motocross-bumps/bim/best_cases/bim/bim_motocross-bumps_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/motocross-bumps/bim/best_cases/bim/bim_motocross-bumps_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/motocross-bumps/bim/best_cases/bim/bim_motocross-bumps_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9600682481161789,
+      "clean_iou": 0.9608239095315024,
+      "adv_iou": 0.0007556614153236044,
+      "summary": {
+        "attack_name": "bim",
+        "sequence": "motocross-bumps",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9608239095315024,
+        "clean_dice": 0.9800205973223481,
+        "adv_iou": 0.0007556614153236044,
+        "adv_dice": 0.0015101816446482183,
+        "perturbation_norm": {
+          "l2": 35.59482192993164,
+          "linf": 0.030000001192092896,
+          "l1": 54150.703125
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/motocross-bumps/bim/worst_cases/bim/bim_motocross-bumps_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/motocross-bumps/bim/worst_cases/bim/bim_motocross-bumps_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/motocross-bumps/bim/worst_cases/bim/bim_motocross-bumps_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "pgd": {
+    "best": {
+      "score": 0.9248408877040093,
+      "clean_iou": 0.9489795918367347,
+      "adv_iou": 0.024138704132725505,
+      "summary": {
+        "attack_name": "pgd",
+        "sequence": "miami-surf",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9489795918367347,
+        "clean_dice": 0.9738219895287958,
+        "adv_iou": 0.024138704132725505,
+        "adv_dice": 0.047139521307647404,
+        "perturbation_norm": {
+          "l2": 30.541175842285156,
+          "linf": 0.029999971389770508,
+          "l1": 46829.37109375
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/miami-surf/pgd/best_cases/pgd/pgd_miami-surf_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/miami-surf/pgd/best_cases/pgd/pgd_miami-surf_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/miami-surf/pgd/best_cases/pgd/pgd_miami-surf_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9248408877040093,
+      "clean_iou": 0.9489795918367347,
+      "adv_iou": 0.024138704132725505,
+      "summary": {
+        "attack_name": "pgd",
+        "sequence": "miami-surf",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9489795918367347,
+        "clean_dice": 0.9738219895287958,
+        "adv_iou": 0.024138704132725505,
+        "adv_dice": 0.047139521307647404,
+        "perturbation_norm": {
+          "l2": 30.541175842285156,
+          "linf": 0.029999971389770508,
+          "l1": 46829.37109375
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/miami-surf/pgd/worst_cases/pgd/pgd_miami-surf_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/miami-surf/pgd/worst_cases/pgd/pgd_miami-surf_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/miami-surf/pgd/worst_cases/pgd/pgd_miami-surf_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

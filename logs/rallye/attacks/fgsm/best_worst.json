@@ -1,0 +1,56 @@
+{
+  "fgsm": {
+    "best": {
+      "score": 0.956353036773519,
+      "clean_iou": 0.9687108886107635,
+      "adv_iou": 0.012357851837244463,
+      "summary": {
+        "attack_name": "fgsm",
+        "sequence": "rallye",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9687108886107635,
+        "clean_dice": 0.9841068022886205,
+        "adv_iou": 0.012357851837244463,
+        "adv_dice": 0.02441399909096812,
+        "perturbation_norm": {
+          "l2": 51.68138885498047,
+          "linf": 0.030000001192092896,
+          "l1": 89300.65625
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/rallye/fgsm/best_cases/fgsm/fgsm_rallye_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/rallye/fgsm/best_cases/fgsm/fgsm_rallye_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/rallye/fgsm/best_cases/fgsm/fgsm_rallye_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.956353036773519,
+      "clean_iou": 0.9687108886107635,
+      "adv_iou": 0.012357851837244463,
+      "summary": {
+        "attack_name": "fgsm",
+        "sequence": "rallye",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9687108886107635,
+        "clean_dice": 0.9841068022886205,
+        "adv_iou": 0.012357851837244463,
+        "adv_dice": 0.02441399909096812,
+        "perturbation_norm": {
+          "l2": 51.68138885498047,
+          "linf": 0.030000001192092896,
+          "l1": 89300.65625
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/rallye/fgsm/worst_cases/fgsm/fgsm_rallye_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/rallye/fgsm/worst_cases/fgsm/fgsm_rallye_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/rallye/fgsm/worst_cases/fgsm/fgsm_rallye_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

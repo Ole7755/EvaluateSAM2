@@ -1,0 +1,18 @@
+{
+  "attack_name": "pgd",
+  "sequence": "dog-gooses",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9704033525405972,
+  "clean_dice": 0.9849793965173468,
+  "adv_iou": 0.002149370839506688,
+  "adv_dice": 0.00428952190571381,
+  "perturbation_norm": {
+    "l2": 30.709989547729492,
+    "linf": 0.0299999862909317,
+    "l1": 47166.8125
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/dog-gooses/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/dog-gooses/00000.png"
+}

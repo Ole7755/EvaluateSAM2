@@ -1,0 +1,10 @@
+{
+  "attack_name": "cw",
+  "epsilon": 0.03,
+  "step_size": 0.01,
+  "steps": 40,
+  "random_start": false,
+  "cw_confidence": 0.0,
+  "cw_learning_rate": 0.01,
+  "cw_binary_steps": 5
+}

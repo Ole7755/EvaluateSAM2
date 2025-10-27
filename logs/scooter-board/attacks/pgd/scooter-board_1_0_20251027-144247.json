@@ -1,0 +1,18 @@
+{
+  "attack_name": "pgd",
+  "sequence": "scooter-board",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9889761052753088,
+  "clean_dice": 0.9944575026841938,
+  "adv_iou": 0.0,
+  "adv_dice": 0.0,
+  "perturbation_norm": {
+    "l2": 35.75718307495117,
+    "linf": 0.030000001192092896,
+    "l1": 54626.3828125
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/scooter-board/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/scooter-board/00000.png"
+}

@@ -1,0 +1,18 @@
+{
+  "attack_name": "fgsm",
+  "sequence": "bear",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9899157621901831,
+  "clean_dice": 0.9949323292968353,
+  "adv_iou": 0.06738999350023885,
+  "adv_dice": 0.12627061132407696,
+  "perturbation_norm": {
+    "l2": 53.19039535522461,
+    "linf": 0.030000001192092896,
+    "l1": 94328.8125
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/bear/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/bear/00000.png"
+}

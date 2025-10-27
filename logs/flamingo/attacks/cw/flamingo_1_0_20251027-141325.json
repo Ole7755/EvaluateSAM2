@@ -1,0 +1,18 @@
+{
+  "attack_name": "cw",
+  "sequence": "flamingo",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9889995669120831,
+  "clean_dice": 0.9944693637590907,
+  "adv_iou": 0.18937230673381444,
+  "adv_dice": 0.3184407534321322,
+  "perturbation_norm": {
+    "l2": 6.870187759399414,
+    "linf": 0.030000001192092896,
+    "l1": 8733.1875
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/flamingo/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/flamingo/00000.png"
+}

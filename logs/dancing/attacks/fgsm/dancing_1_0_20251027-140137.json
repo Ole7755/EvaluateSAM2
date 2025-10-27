@@ -1,0 +1,18 @@
+{
+  "attack_name": "fgsm",
+  "sequence": "dancing",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9914101154480484,
+  "clean_dice": 0.9956865316263501,
+  "adv_iou": 0.0046965896354806,
+  "adv_dice": 0.009349269588313412,
+  "perturbation_norm": {
+    "l2": 51.42171096801758,
+    "linf": 0.030000001192092896,
+    "l1": 88876.515625
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/dancing/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/dancing/00000.png"
+}

@@ -1,0 +1,18 @@
+{
+  "attack_name": "cw",
+  "sequence": "kid-football",
+  "frame_idx": 0,
+  "obj_id": 1,
+  "gt_label": 1,
+  "clean_iou": 0.9986495673959003,
+  "clean_dice": 0.9993243274728449,
+  "adv_iou": 0.516317420806357,
+  "adv_dice": 0.6810149560001578,
+  "perturbation_norm": {
+    "l2": 6.457839488983154,
+    "linf": 0.029999971389770508,
+    "l1": 9014.609375
+  },
+  "frame_path": "/home/featurize/AttackSAM2/data/DAVIS/JPEGImages/480p/kid-football/00000.jpg",
+  "mask_path": "/home/featurize/AttackSAM2/data/DAVIS/Annotations_unsupervised/480p/kid-football/00000.png"
+}

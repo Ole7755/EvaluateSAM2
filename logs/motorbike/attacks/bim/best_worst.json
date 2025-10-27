@@ -1,0 +1,56 @@
+{
+  "bim": {
+    "best": {
+      "score": 0.9306885048269713,
+      "clean_iou": 0.9421424962102072,
+      "adv_iou": 0.01145399138323584,
+      "summary": {
+        "attack_name": "bim",
+        "sequence": "motorbike",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9421424962102072,
+        "clean_dice": 0.9702094445167165,
+        "adv_iou": 0.01145399138323584,
+        "adv_dice": 0.022648566283418756,
+        "perturbation_norm": {
+          "l2": 35.5358772277832,
+          "linf": 0.030000001192092896,
+          "l1": 54055.375
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/motorbike/bim/best_cases/bim/bim_motorbike_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/motorbike/bim/best_cases/bim/bim_motorbike_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/motorbike/bim/best_cases/bim/bim_motorbike_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9306885048269713,
+      "clean_iou": 0.9421424962102072,
+      "adv_iou": 0.01145399138323584,
+      "summary": {
+        "attack_name": "bim",
+        "sequence": "motorbike",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9421424962102072,
+        "clean_dice": 0.9702094445167165,
+        "adv_iou": 0.01145399138323584,
+        "adv_dice": 0.022648566283418756,
+        "perturbation_norm": {
+          "l2": 35.5358772277832,
+          "linf": 0.030000001192092896,
+          "l1": 54055.375
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/motorbike/bim/worst_cases/bim/bim_motorbike_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/motorbike/bim/worst_cases/bim/bim_motorbike_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/motorbike/bim/worst_cases/bim/bim_motorbike_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

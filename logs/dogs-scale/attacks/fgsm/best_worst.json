@@ -1,0 +1,56 @@
+{
+  "fgsm": {
+    "best": {
+      "score": 0.9801243582197132,
+      "clean_iou": 0.9908013444188927,
+      "adv_iou": 0.01067698619917941,
+      "summary": {
+        "attack_name": "fgsm",
+        "sequence": "dogs-scale",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9908013444188927,
+        "clean_dice": 0.9953794206504354,
+        "adv_iou": 0.01067698619917941,
+        "adv_dice": 0.021128384924113116,
+        "perturbation_norm": {
+          "l2": 52.857181549072266,
+          "linf": 0.030000001192092896,
+          "l1": 93418.734375
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/dogs-scale/fgsm/best_cases/fgsm/fgsm_dogs-scale_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/dogs-scale/fgsm/best_cases/fgsm/fgsm_dogs-scale_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/dogs-scale/fgsm/best_cases/fgsm/fgsm_dogs-scale_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.9801243582197132,
+      "clean_iou": 0.9908013444188927,
+      "adv_iou": 0.01067698619917941,
+      "summary": {
+        "attack_name": "fgsm",
+        "sequence": "dogs-scale",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9908013444188927,
+        "clean_dice": 0.9953794206504354,
+        "adv_iou": 0.01067698619917941,
+        "adv_dice": 0.021128384924113116,
+        "perturbation_norm": {
+          "l2": 52.857181549072266,
+          "linf": 0.030000001192092896,
+          "l1": 93418.734375
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/dogs-scale/fgsm/worst_cases/fgsm/fgsm_dogs-scale_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/dogs-scale/fgsm/worst_cases/fgsm/fgsm_dogs-scale_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/dogs-scale/fgsm/worst_cases/fgsm/fgsm_dogs-scale_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}

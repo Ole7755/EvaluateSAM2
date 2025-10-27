@@ -1,0 +1,56 @@
+{
+  "cw": {
+    "best": {
+      "score": 0.8914990100646185,
+      "clean_iou": 0.9713098377687205,
+      "adv_iou": 0.079810827704102,
+      "summary": {
+        "attack_name": "cw",
+        "sequence": "scooter-gray",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9713098377687205,
+        "clean_dice": 0.9854461426196943,
+        "adv_iou": 0.079810827704102,
+        "adv_dice": 0.14782372181578526,
+        "perturbation_norm": {
+          "l2": 4.229350566864014,
+          "linf": 0.029999971389770508,
+          "l1": 5232.169921875
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/scooter-gray/cw/best_cases/cw/cw_scooter-gray_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/scooter-gray/cw/best_cases/cw/cw_scooter-gray_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/scooter-gray/cw/best_cases/cw/cw_scooter-gray_frame00000_obj1_perturbation.png"
+      }
+    },
+    "worst": {
+      "score": 0.8914990100646185,
+      "clean_iou": 0.9713098377687205,
+      "adv_iou": 0.079810827704102,
+      "summary": {
+        "attack_name": "cw",
+        "sequence": "scooter-gray",
+        "frame_idx": 0,
+        "obj_id": 1,
+        "gt_label": 1,
+        "clean_iou": 0.9713098377687205,
+        "clean_dice": 0.9854461426196943,
+        "adv_iou": 0.079810827704102,
+        "adv_dice": 0.14782372181578526,
+        "perturbation_norm": {
+          "l2": 4.229350566864014,
+          "linf": 0.029999971389770508,
+          "l1": 5232.169921875
+        }
+      },
+      "artifacts": {
+        "clean": "/home/featurize/AttackSAM2/outputs/scooter-gray/cw/worst_cases/cw/cw_scooter-gray_frame00000_obj1_clean.png",
+        "adv": "/home/featurize/AttackSAM2/outputs/scooter-gray/cw/worst_cases/cw/cw_scooter-gray_frame00000_obj1_adv.png",
+        "perturbation": "/home/featurize/AttackSAM2/outputs/scooter-gray/cw/worst_cases/cw/cw_scooter-gray_frame00000_obj1_perturbation.png"
+      }
+    }
+  }
+}
