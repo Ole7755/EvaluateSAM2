@@ -80,6 +80,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--steps", type=int, default=40, help="迭代步数，对于 FGSM 可保持默认。")
     parser.add_argument("--random-start", action="store_true", help="PGD 是否随机初始化。")
     parser.add_argument("--input-size", type=int, default=1024, help="输入统一缩放到的分辨率。")
+    parser.add_argument(
+        "--keep-aspect-ratio",
+        action="store_true",
+        help="按长边等比例缩放并填充至正方形（默认关闭，与官方推理保持一致）。",
+    )
     parser.add_argument("--mask-threshold", type=float, default=0.5, help="概率图转二值掩码的阈值。")
     parser.add_argument("--cw-confidence", type=float, default=0.0, help="C&W 置信度超参数。")
     parser.add_argument("--cw-binary-steps", type=int, default=5, help="C&W 内部二分搜索次数。")
@@ -166,10 +171,14 @@ def main() -> None:
     if not mask_path.exists():
         raise FileNotFoundError(f"未找到首帧掩码：{mask_path}")
 
-    # 载入图像与掩码，并按官方预处理缩放 + 填充
+    # 载入图像与掩码，根据参数执行缩放/填充
     image_tensor = load_rgb_tensor(frame_path, device=device)
     origin_hw = tuple(image_tensor.shape[-2:])
-    resized_image, resize_info = resize_image_tensor(image_tensor, args.input_size)
+    resized_image, resize_info = resize_image_tensor(
+        image_tensor,
+        args.input_size,
+        keep_aspect_ratio=args.keep_aspect_ratio,
+    )
 
     raw_mask = load_mask_tensor(mask_path, device=device)
     binary_mask = mask_to_binary(raw_mask, label=args.gt_label)

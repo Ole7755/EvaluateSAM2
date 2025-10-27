@@ -154,47 +154,74 @@ def eval_masks_numpy(pred_mask: np.ndarray, gt_mask: np.ndarray) -> Tuple[float,
 
 @dataclass
 class ResizePadInfo:
-    """记录保持纵横比缩放 + 填充的元数据。"""
+    """记录图像缩放与填充的元数据。"""
 
     orig_height: int
     orig_width: int
     resized_height: int
     resized_width: int
     target_size: int
-    scale: float
+    scale_y: float
+    scale_x: float
+    pad_bottom: int
+    pad_right: int
+    keep_aspect_ratio: bool
 
 
-def resize_image_tensor(tensor: torch.Tensor, target_size: int) -> tuple[torch.Tensor, ResizePadInfo]:
+def resize_image_tensor(
+    tensor: torch.Tensor,
+    target_size: int,
+    keep_aspect_ratio: bool = False,
+) -> tuple[torch.Tensor, ResizePadInfo]:
     """
-    使用官方 SAM/SAM2 预处理策略：先按长边等比例缩放，再填充到正方形。
-    返回填充后的张量和对应的缩放信息。
+    将图像缩放至 SAM2 输入尺寸。
+    - 默认行为与官方 `load_video_frames` 对齐：直接拉伸至正方形；
+    - 若 keep_aspect_ratio=True，则按长边缩放并在右/下补零。
     """
     if tensor.ndim not in (3, 4):
         raise ValueError("resize_image_tensor 仅支持 (C,H,W) 或 (B,C,H,W) 输入。")
 
     orig_height, orig_width = tensor.shape[-2], tensor.shape[-1]
-    scale = float(target_size) / float(max(orig_height, orig_width))
-    resized_height = max(int(round(orig_height * scale)), 1)
-    resized_width = max(int(round(orig_width * scale)), 1)
-
     need_squeeze = tensor.ndim == 3
-    if need_squeeze:
-        tensor = tensor.unsqueeze(0)
+    batch_tensor = tensor.unsqueeze(0) if need_squeeze else tensor
 
-    resized = F.interpolate(
-        tensor,
-        size=(resized_height, resized_width),
-        mode="bilinear",
-        align_corners=False,
-    )
-    padded = torch.zeros(
-        (resized.size(0), resized.size(1), target_size, target_size),
-        dtype=resized.dtype,
-        device=resized.device,
-    )
-    padded[..., :resized_height, :resized_width] = resized
+    if keep_aspect_ratio:
+        scale = float(target_size) / float(max(orig_height, orig_width))
+        resized_height = max(int(round(orig_height * scale)), 1)
+        resized_width = max(int(round(orig_width * scale)), 1)
+        resized = F.interpolate(
+            batch_tensor,
+            size=(resized_height, resized_width),
+            mode="bilinear",
+            align_corners=False,
+        )
+        padded = torch.zeros(
+            (resized.size(0), resized.size(1), target_size, target_size),
+            dtype=resized.dtype,
+            device=resized.device,
+        )
+        padded[..., :resized_height, :resized_width] = resized
+        output = padded
+        pad_bottom = target_size - resized_height
+        pad_right = target_size - resized_width
+        scale_y = scale_x = scale
+    else:
+        resized_height = target_size
+        resized_width = target_size
+        resized = F.interpolate(
+            batch_tensor,
+            size=(target_size, target_size),
+            mode="bilinear",
+            align_corners=False,
+        )
+        output = resized
+        pad_bottom = 0
+        pad_right = 0
+        scale_y = float(target_size) / float(orig_height)
+        scale_x = float(target_size) / float(orig_width)
+
     if need_squeeze:
-        padded = padded.squeeze(0)
+        output = output.squeeze(0)
 
     info = ResizePadInfo(
         orig_height=orig_height,
@@ -202,14 +229,18 @@ def resize_image_tensor(tensor: torch.Tensor, target_size: int) -> tuple[torch.T
         resized_height=resized_height,
         resized_width=resized_width,
         target_size=target_size,
-        scale=scale,
+        scale_y=scale_y,
+        scale_x=scale_x,
+        pad_bottom=pad_bottom,
+        pad_right=pad_right,
+        keep_aspect_ratio=keep_aspect_ratio,
     )
-    return padded.contiguous(), info
+    return output.contiguous(), info
 
 
 def resize_mask_tensor(tensor: torch.Tensor, info: ResizePadInfo) -> torch.Tensor:
     """
-    按照图像的缩放信息对掩码进行最近邻缩放与填充，保持掩码与图像对齐。
+    按照图像的缩放信息对掩码进行缩放与填充，保持与图像对齐。
     返回形状为 (B, 1, target_size, target_size) 的张量。
     """
     if tensor.ndim == 2:
@@ -222,18 +253,23 @@ def resize_mask_tensor(tensor: torch.Tensor, info: ResizePadInfo) -> torch.Tenso
     elif tensor.ndim != 4:
         raise ValueError("resize_mask_tensor 仅支持 (H,W)、(1,H,W) 或 (B,1,H,W) 的掩码。")
 
+    tensor = tensor.float()
     resized = F.interpolate(
         tensor,
         size=(info.resized_height, info.resized_width),
-        mode="nearest",
+        mode="bilinear",
+        align_corners=False,
     )
-    padded = torch.zeros(
-        (resized.size(0), resized.size(1), info.target_size, info.target_size),
-        dtype=resized.dtype,
-        device=resized.device,
-    )
-    padded[..., :info.resized_height, :info.resized_width] = resized
-    return padded
+    resized = (resized >= 0.5).float()
+    if info.keep_aspect_ratio:
+        padded = torch.zeros(
+            (resized.size(0), resized.size(1), info.target_size, info.target_size),
+            dtype=resized.dtype,
+            device=resized.device,
+        )
+        padded[..., : info.resized_height, : info.resized_width] = resized
+        return padded
+    return resized
 
 
 def _crop_to_resized_region(tensor: torch.Tensor, info: ResizePadInfo) -> torch.Tensor:
