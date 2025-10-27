@@ -1,7 +1,7 @@
 """
 针对 SAM2 实现通用扰动（UAP）攻击的命令行脚本。
 
-当前版本仅支持对首帧进行攻击，后续可扩展为逐帧或序列级别。
+修复方案A：使用标准 SAM2 推理流程获取正确的 baseline。
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ from typing import Dict, Tuple
 
 import os
 import torch
+import numpy as np
+from PIL import Image
 
 if __package__ is None:  # pragma: no cover - 兼容直接以 python 执行脚本
     sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -59,8 +61,15 @@ os.environ.setdefault("SAM2_CONFIG_DIR", str(CONFIG_PATH.parent))
 def parse_args() -> argparse.Namespace:
     """解析命令行参数，集中管理默认值。"""
     parser = argparse.ArgumentParser(description="对 SAM2 施加通用扰动 (UAP) 攻击。")
-    parser.add_argument("--sequence", type=str, required=True, help="DAVIS 序列名称，例如 bear。")
-    parser.add_argument("--frame-token", type=str, default="00000", help="要攻击的帧编号，默认首帧 00000。")
+    parser.add_argument(
+        "--sequence", type=str, required=True, help="DAVIS 序列名称，例如 bear。"
+    )
+    parser.add_argument(
+        "--frame-token",
+        type=str,
+        default="00000",
+        help="要攻击的帧编号，默认首帧 00000。",
+    )
     parser.add_argument(
         "--gt-label",
         type=int,
@@ -77,19 +86,33 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--epsilon", type=float, default=0.03, help="L_inf 扰动半径。")
     parser.add_argument("--step-size", type=float, default=0.01, help="每步更新步长。")
-    parser.add_argument("--steps", type=int, default=40, help="迭代步数，对于 FGSM 可保持默认。")
-    parser.add_argument("--random-start", action="store_true", help="PGD 是否随机初始化。")
-    parser.add_argument("--input-size", type=int, default=1024, help="输入统一缩放到的分辨率。")
+    parser.add_argument(
+        "--steps", type=int, default=40, help="迭代步数，对于 FGSM 可保持默认。"
+    )
+    parser.add_argument(
+        "--random-start", action="store_true", help="PGD 是否随机初始化。"
+    )
+    parser.add_argument(
+        "--input-size", type=int, default=1024, help="输入统一缩放到的分辨率。"
+    )
     parser.add_argument(
         "--keep-aspect-ratio",
         action="store_true",
         help="按长边等比例缩放并填充至正方形（默认关闭，与官方推理保持一致）。",
     )
-    parser.add_argument("--mask-threshold", type=float, default=0.5, help="概率图转二值掩码的阈值。")
-    parser.add_argument("--cw-confidence", type=float, default=0.0, help="C&W 置信度超参数。")
-    parser.add_argument("--cw-binary-steps", type=int, default=5, help="C&W 内部二分搜索次数。")
+    parser.add_argument(
+        "--mask-threshold", type=float, default=0.5, help="概率图转二值掩码的阈值。"
+    )
+    parser.add_argument(
+        "--cw-confidence", type=float, default=0.0, help="C&W 置信度超参数。"
+    )
+    parser.add_argument(
+        "--cw-binary-steps", type=int, default=5, help="C&W 内部二分搜索次数。"
+    )
     parser.add_argument("--cw-lr", type=float, default=0.01, help="C&W 优化器学习率。")
-    parser.add_argument("--device", type=str, default="cuda", help="指定使用的设备，可为 cuda 或 cpu。")
+    parser.add_argument(
+        "--device", type=str, default="cuda", help="指定使用的设备，可为 cuda 或 cpu。"
+    )
     return parser.parse_args()
 
 
@@ -109,7 +132,9 @@ def find_frame_path(rgb_dir: Path, frame_token: str) -> Path:
         candidate = rgb_dir / f"{frame_token}{ext}"
         if candidate.exists():
             return candidate
-    raise FileNotFoundError(f"序列 {rgb_dir.parent.name} 的帧 {frame_token} 文件不存在。")
+    raise FileNotFoundError(
+        f"序列 {rgb_dir.parent.name} 的帧 {frame_token} 文件不存在。"
+    )
 
 
 def build_attack(args: argparse.Namespace) -> Tuple[object, AttackConfig]:
@@ -150,11 +175,31 @@ def build_attack(args: argparse.Namespace) -> Tuple[object, AttackConfig]:
     return attack, config
 
 
+def normalize_object_ids(object_ids):
+    """将对象ID标准化为列表。"""
+    if isinstance(object_ids, torch.Tensor):
+        if object_ids.ndim == 0:
+            return [int(object_ids.item())]
+        return [int(item) for item in object_ids.cpu().tolist()]
+    return [int(item) for item in object_ids]
+
+
+def normalize_masks(masks):
+    """将掩码标准化为列表。"""
+    if isinstance(masks, torch.Tensor):
+        if masks.ndim == 2:
+            return [masks]
+        return [masks[idx] for idx in range(masks.shape[0])]
+    return [torch.as_tensor(mask) for mask in masks]
+
+
 def main() -> None:
     args = parse_args()
     ensure_prerequisites()
 
-    device = torch.device(args.device if torch.cuda.is_available() or args.device == "cpu" else "cpu")
+    device = torch.device(
+        args.device if torch.cuda.is_available() or args.device == "cpu" else "cpu"
+    )
 
     sequence = args.sequence
     frame_token = args.frame_token
@@ -171,7 +216,62 @@ def main() -> None:
     if not mask_path.exists():
         raise FileNotFoundError(f"未找到首帧掩码：{mask_path}")
 
-    # 载入图像与掩码，根据参数执行缩放/填充
+    # ===== 修改：使用标准 SAM2 推理流程获取 baseline =====
+    print("[INFO] 使用标准 SAM2 推理流程计算 clean baseline...")
+
+    # 加载掩码（原始分辨率）
+    raw_mask = load_mask_tensor(mask_path, device=device)
+    binary_mask = mask_to_binary(raw_mask, label=args.gt_label)
+    gt_mask_numpy = binary_mask.detach().cpu().numpy().astype(bool)
+
+    # 构建视频预测器并初始化状态
+    predictor = build_sam2_video_predictor(CONFIG_PATH.name, WEIGHT_PATH.as_posix())
+    state = predictor.init_state(rgb_dir.as_posix())
+
+    # 使用原始分辨率的掩码作为提示（与 segment_video_with_first_mask.py 一致）
+    try:
+        initial = predictor.add_new_mask(
+            state,
+            frame_idx=0,
+            obj_id=args.obj_id,
+            mask=binary_mask,
+        )
+    except TypeError:
+        initial = predictor.add_new_mask(
+            state,
+            frame_idx=0,
+            obj_id=args.obj_id,
+            mask_tensor=binary_mask,
+        )
+
+    # 获取干净样本的预测结果
+    frame_idx, object_ids, masks = initial
+    object_ids_list = normalize_object_ids(object_ids)
+    masks_list = normalize_masks(masks)
+
+    # 找到对应 obj_id 的掩码
+    clean_mask = None
+    for oid, mask in zip(object_ids_list, masks_list):
+        if oid == args.obj_id:
+            clean_mask = mask
+            break
+
+    if clean_mask is None:
+        raise RuntimeError(f"未找到 obj_id={args.obj_id} 的预测掩码")
+
+    # 转换为 numpy 并计算指标
+    clean_mask = clean_mask.squeeze()
+    clean_mask_np = (
+        (clean_mask > args.mask_threshold).detach().cpu().numpy().astype(bool)
+    )
+    clean_iou, clean_dice = eval_masks_numpy(clean_mask_np, gt_mask_numpy)
+
+    print(f"[INFO] Clean baseline - IoU: {clean_iou:.6f}, Dice: {clean_dice:.6f}")
+
+    # ===== 执行攻击部分 =====
+    print(f"[INFO] 开始执行 {args.attack.upper()} 攻击...")
+
+    # 载入图像用于攻击（需要缩放到指定大小）
     image_tensor = load_rgb_tensor(frame_path, device=device)
     origin_hw = tuple(image_tensor.shape[-2:])
     resized_image, resize_info = resize_image_tensor(
@@ -180,20 +280,14 @@ def main() -> None:
         keep_aspect_ratio=args.keep_aspect_ratio,
     )
 
-    raw_mask = load_mask_tensor(mask_path, device=device)
-    binary_mask = mask_to_binary(raw_mask, label=args.gt_label)
+    # 缩放掩码（用于攻击时的 prompt）
     resized_mask = resize_mask_tensor(binary_mask, resize_info).to(device)
 
-    gt_mask_numpy = binary_mask.detach().cpu().numpy().astype(bool)
-
-    # 构建预测器与前向辅助
-    predictor = build_sam2_video_predictor(CONFIG_PATH.name, WEIGHT_PATH.as_posix())
+    # 构建攻击器和辅助类
     helper = SAM2ForwardHelper(predictor, device=device)
-
-    clean_input = resized_image.unsqueeze(0)
     attack, attack_config = build_attack(args)
 
-    # 初始化日志目录与输出路径
+    # 初始化日志目录
     attack_dir = OUTPUT_ROOT / sequence / args.attack
     attack_dir.mkdir(parents=True, exist_ok=True)
     log_dir = LOG_ROOT / sequence / "attacks" / args.attack
@@ -205,13 +299,8 @@ def main() -> None:
     )
     logger.save_config(attack_config)
 
-    # 计算干净样本的预测，用于基线指标
-    clean_output = helper.forward(clean_input, prompt_mask=resized_mask)
-    clean_probs = clean_output.probs
-    clean_mask_np = mask_probs_to_numpy(clean_probs, resize_info, origin_hw, args.mask_threshold)
-    clean_iou, clean_dice = eval_masks_numpy(clean_mask_np, gt_mask_numpy)
-
-    # 执行攻击生成通用扰动
+    # 生成对抗样本
+    clean_input = resized_image.unsqueeze(0)
     perturbation = attack.generate(
         helper=helper,
         clean_image=clean_input,
@@ -220,18 +309,31 @@ def main() -> None:
     )
     adv_input = (clean_input + perturbation).clamp(0.0, 1.0)
 
+    # 获取对抗样本的预测
     adv_output = helper.forward(adv_input, prompt_mask=resized_mask)
     adv_probs = adv_output.probs
-    adv_mask_np = mask_probs_to_numpy(adv_probs, resize_info, origin_hw, args.mask_threshold)
+    adv_mask_np = mask_probs_to_numpy(
+        adv_probs, resize_info, origin_hw, args.mask_threshold
+    )
     adv_iou, adv_dice = eval_masks_numpy(adv_mask_np, gt_mask_numpy)
 
-    # 计算扰动范数并写入日志
+    print(f"[INFO] Adversarial - IoU: {adv_iou:.6f}, Dice: {adv_dice:.6f}")
+    print(f"[INFO] Attack效果 - ΔIoU: {clean_iou - adv_iou:.6f}")
+
+    # 计算扰动范数
     perturbation_norms = compute_perturbation_norms(perturbation)
     delta_iou = clean_iou - adv_iou
 
-    clean_vis = restore_image_tensor(clean_input, resize_info, origin_hw).squeeze(0).detach()
-    adv_vis = restore_image_tensor(adv_input, resize_info, origin_hw).squeeze(0).detach()
-    perturbation_vis = restore_image_tensor(perturbation, resize_info, origin_hw).squeeze(0).detach()
+    # 保存可视化结果
+    clean_vis = (
+        restore_image_tensor(clean_input, resize_info, origin_hw).squeeze(0).detach()
+    )
+    adv_vis = (
+        restore_image_tensor(adv_input, resize_info, origin_hw).squeeze(0).detach()
+    )
+    perturbation_vis = (
+        restore_image_tensor(perturbation, resize_info, origin_hw).squeeze(0).detach()
+    )
 
     clean_image_path = attack_dir / f"{frame_token}_clean.png"
     adv_image_path = attack_dir / f"{frame_token}_adv.png"
@@ -241,6 +343,7 @@ def main() -> None:
     save_rgb_tensor(adv_vis, adv_image_path)
     save_perturbation_image(perturbation_vis, perturbation_image_path)
 
+    # 保存总结信息
     summary = AttackSummary(
         attack_name=args.attack,
         sequence=sequence,
@@ -253,9 +356,12 @@ def main() -> None:
         adv_dice=adv_dice,
         perturbation_norm=perturbation_norms,
     )
-    logger.save_summary(summary, extra={"frame_path": str(frame_path), "mask_path": str(mask_path)})
+    logger.save_summary(
+        summary, extra={"frame_path": str(frame_path), "mask_path": str(mask_path)}
+    )
     logger.save_tensor(perturbation.squeeze(0), name=f"{sequence}_{args.attack}_uap")
 
+    # 更新最佳/最差案例
     artifacts = {
         "clean": clean_image_path,
         "adv": adv_image_path,
@@ -281,18 +387,18 @@ def main() -> None:
                 f"已保存至 {tracker.worst_root / args.attack}"
             )
 
+    # 保存掩码
     mask_dir = attack_dir / "masks"
     mask_dir.mkdir(parents=True, exist_ok=True)
     clean_mask_img = (clean_mask_np.astype(float) * 255).astype("uint8")
     adv_mask_img = (adv_mask_np.astype(float) * 255).astype("uint8")
     gt_mask_img = (gt_mask_numpy.astype(float) * 255).astype("uint8")
 
-    from PIL import Image
-
     Image.fromarray(clean_mask_img).save(mask_dir / f"{frame_token}_clean.png")
     Image.fromarray(adv_mask_img).save(mask_dir / f"{frame_token}_adv.png")
     Image.fromarray(gt_mask_img).save(mask_dir / f"{frame_token}_gt.png")
 
+    # 保存指标报告
     report: Dict[str, float] = {
         "clean_iou": clean_iou,
         "clean_dice": clean_dice,
