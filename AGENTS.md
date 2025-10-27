@@ -15,10 +15,82 @@
 
 脚本说明
 ------
-- `scripts/attack_bear.py`：使用首帧掩码初始化单目标视频分割（序列 `bear`），并将结果写入 `outputs/bear/`。
-- `scripts/segment_video_with_first_mask.py`：将带实例标签的首帧掩码拆分为多个对象并传播（默认序列 `walking`），结果保存到 `outputs/<sequence>/`。
-- `scripts/evaluate_sam2_metrics.py`：对比预测与真值掩码，输出逐帧与平均的 mIoU、Dice，可通过 `--output` 将指标写入日志文件。
-- `scripts/sam2tutorial.py`：单张图片的 SAM2 交互示例，输出保存在 `outputs/tutorial/`。
+- `scripts/attack_bear.py`：最小化示例，演示如何用首帧掩码初始化 `bear` 序列并把预测写入 `outputs/bear/`。
+- `scripts/segment_video_with_first_mask.py`：批量拆分 DAVIS 首帧标签，调用官方 `SAM2VideoPredictor` 在整段视频上传播掩码，适合生成基线结果。
+- `scripts/evaluate_sam2_metrics.py`：比较预测与真值掩码，逐帧打印 IoU/Dice，并可选写入 CSV 风格的日志文件。
+- `scripts/inspect_davis_dataset.py`：汇总 DAVIS 序列的分辨率、帧数和标签占比，辅助挑选基线可靠的序列。
+- `scripts/run_uap_attack.py`：首帧像素级对抗攻击入口，支持 FGSM / PGD / BIM / C&W，可同时记录干净基线和攻击后指标。
+- `scripts/run_attacks_batch.sh`：批量跑完整个序列列表和四种攻击的 Bash 脚本，内置 metrics 跳过机制。
+- `scripts/sam2tutorial.py`：单张图片的交互式示例。
+
+脚本用法
+------
+- `scripts/segment_video_with_first_mask.py`  
+  ```
+  python3 scripts/segment_video_with_first_mask.py \
+    --sequence bear \
+    --resolution 480p \
+    --mask-subdir Annotations \
+    --frame-token 00000 \
+    --verbose
+  ```
+  关键参数：`--sequence` 指定 DAVIS 序列；`--mask-subdir` 挑选标签来源（监督/无监督）；`--max-objects` 可截断对象数量；`--output-root` 默认为 `outputs/`。
+
+- `scripts/evaluate_sam2_metrics.py`  
+  ```
+  python3 scripts/evaluate_sam2_metrics.py \
+    --pred-dir outputs/bear \
+    --gt-dir data/DAVIS/Annotations/480p/bear \
+    --obj-id 1 \
+    --gt-label 1 \
+    --output logs/bear/metrics.csv
+  ```
+  若预测目录按 `*_id{obj}.png` 命名，可通过 `--obj-id` 选定对象；多标签真值可设定 `--gt-label`。
+
+- `scripts/run_uap_attack.py`  
+  ```
+  python3 scripts/run_uap_attack.py \
+    --sequence bear \
+    --frame-token 00000 \
+    --gt-label 1 \
+    --obj-id 1 \
+    --attack pgd \
+    --epsilon 0.03 \
+    --step-size 0.01 \
+    --steps 40 \
+    --random-start \
+    --input-size 1024 \
+    --mask-threshold 0.5 \
+    --device cuda
+  ```
+  默认先用标准 `SAM2VideoPredictor` 计算干净基线，再执行攻击。`--attack` 支持 `fgsm/pgd/bim/cw`；PGD/BIM 可加 `--random-start`；C&W 需额外配置 `--cw-lr`、`--cw-confidence`、`--cw-binary-steps`；如需等比例缩放后 padding，可启用 `--keep-aspect-ratio`。
+
+- `scripts/run_attacks_batch.sh`  
+  ```
+  ./scripts/run_attacks_batch.sh
+  ```
+  Bash 脚本会遍历内置序列与四种攻击；若 `outputs/<sequence>/<attack>/<frame>_<attack>_metrics.json` 已存在则自动跳过。可在脚本顶部的 `GT_LABELS` 字典中为多标签序列指定首帧标签。
+
+- `scripts/attack_bear.py`  
+  ```
+  python3 scripts/attack_bear.py
+  ```
+  读取 `bear` 序列的首帧掩码，示例化 `add_new_mask` 接口并把预测写到 `outputs/bear/`。
+
+- `scripts/inspect_davis_dataset.py`  
+  ```
+  python3 scripts/inspect_davis_dataset.py \
+    --sequence bear \
+    --resolution 480p \
+    --mask-subdir Annotations
+  ```
+  打印指定序列的帧数、分辨率、各标签占比，可省略 `--sequence` 以遍历所有序列。
+
+- `scripts/sam2tutorial.py`  
+  ```
+  python3 scripts/sam2tutorial.py --image path/to/image.jpg
+  ```
+  单图示例，用于确认环境和权重加载是否正常。
 
 运行约定
 ------
@@ -43,9 +115,7 @@
 
 下一步计划
 ------
-- 调研并实现首批对抗攻击方法（例如扰动提示点、像素级对抗扰动），衡量对 SAM2 分割性能的影响。
-- 根据实验需要扩展脚本参数化程度（序列选择、对象数量、攻击配置等），确保流程可复用、可批量化。
-- 攻击脚本中 clean IoU 与原生流程对齐：去除额外缩放带来的失真或复用 `add_new_mask` + `propagate` 流程，减少基线差异。
+
 
 问题记录
 ------
