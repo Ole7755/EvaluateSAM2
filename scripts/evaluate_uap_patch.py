@@ -19,11 +19,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import os
+import sys
 import torch
 
-import os
-
 from sam2.build_sam import build_sam2_video_predictor
+
+if __package__ is None:  # pragma: no cover - 兼容直接执行
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from scripts.wheels.attacks import SAM2ForwardHelper
 from scripts.wheels.trainer import EvaluationSummary, UniversalPatchTrainer, load_uap_samples
