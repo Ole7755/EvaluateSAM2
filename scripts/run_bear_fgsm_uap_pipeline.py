@@ -24,7 +24,13 @@ import torch
 
 from sam2.build_sam import build_sam2_video_predictor
 
-from scripts.sam2_attack_utils import (
+import sys
+
+
+if __package__ is None:  # 兼容直接以 python 执行脚本
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+from scripts.sam2_attack_utils import (  # noqa: E402
     compute_perturbation_norms,
     ensure_dir,
     save_perturbation_image,
@@ -302,4 +308,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
