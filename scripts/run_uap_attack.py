@@ -22,7 +22,19 @@ if __package__ is None:  # pragma: no cover - 兼容直接以 python 执行脚�
 
 from sam2.build_sam import build_sam2_video_predictor
 
-from scripts.sam2_attack_utils import (
+from scripts.wheels.attacks import (
+    BIMAttack,
+    CarliniWagnerAttack,
+    FGSMAttack,
+    PGDAttack,
+    SAM2ForwardHelper,
+)
+from scripts.wheels.dataset import (
+    find_frame_path,
+    normalize_masks,
+    normalize_object_ids,
+)
+from scripts.wheels.utils import (
     AttackConfig,
     AttackLogger,
     AttackSummary,
@@ -38,13 +50,6 @@ from scripts.sam2_attack_utils import (
     restore_image_tensor,
     save_rgb_tensor,
     save_perturbation_image,
-)
-from scripts.uap_attacks import (
-    FGSMAttack,
-    PGDAttack,
-    BIMAttack,
-    CarliniWagnerAttack,
-    SAM2ForwardHelper,
 )
 
 # 项目路径与数据目录
@@ -173,24 +178,6 @@ def build_attack(args: argparse.Namespace) -> Tuple[object, AttackConfig]:
         cw_binary_steps=args.cw_binary_steps if args.attack == "cw" else None,
     )
     return attack, config
-
-
-def normalize_object_ids(object_ids):
-    """将对象ID标准化为列表。"""
-    if isinstance(object_ids, torch.Tensor):
-        if object_ids.ndim == 0:
-            return [int(object_ids.item())]
-        return [int(item) for item in object_ids.cpu().tolist()]
-    return [int(item) for item in object_ids]
-
-
-def normalize_masks(masks):
-    """将掩码标准化为列表。"""
-    if isinstance(masks, torch.Tensor):
-        if masks.ndim == 2:
-            return [masks]
-        return [masks[idx] for idx in range(masks.shape[0])]
-    return [torch.as_tensor(mask) for mask in masks]
 
 
 def main() -> None:

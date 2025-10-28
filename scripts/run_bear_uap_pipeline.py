@@ -22,21 +22,13 @@ from sam2.build_sam import build_sam2_video_predictor
 if __package__ is None:  # pragma: no cover - 兼容直接执行
     sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from scripts.run_uap_attack import (  # noqa: E402
+from scripts.wheels.attacks import SAM2ForwardHelper  # noqa: E402
+from scripts.wheels.dataset import (  # noqa: E402
     find_frame_path,
     normalize_masks,
     normalize_object_ids,
 )
-from scripts.sam2_attack_utils import (  # noqa: E402
-    compute_perturbation_norms,
-    eval_masks_numpy,
-    ensure_dir,
-    load_mask_tensor,
-    mask_to_binary,
-    save_perturbation_image,
-)
-from scripts.uap_attacks import SAM2ForwardHelper  # noqa: E402
-from scripts.uap_patch_trainer import (  # noqa: E402
+from scripts.wheels.trainer import (  # noqa: E402
     AggregateMetrics,
     EvaluationSummary,
     SampleEvaluation,
@@ -44,6 +36,14 @@ from scripts.uap_patch_trainer import (  # noqa: E402
     UAPSample,
     UniversalPatchTrainer,
     load_uap_samples,
+)
+from scripts.wheels.utils import (  # noqa: E402
+    compute_perturbation_norms,
+    ensure_dir,
+    eval_masks_numpy,
+    load_mask_tensor,
+    mask_to_binary,
+    save_perturbation_image,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -502,4 +502,3 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
 if __name__ == "__main__":
     main()
-

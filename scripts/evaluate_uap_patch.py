@@ -25,13 +25,9 @@ import os
 
 from sam2.build_sam import build_sam2_video_predictor
 
-from scripts.sam2_attack_utils import compute_perturbation_norms, ensure_dir
-from scripts.uap_attacks import SAM2ForwardHelper
-from scripts.uap_patch_trainer import (
-    EvaluationSummary,
-    UniversalPatchTrainer,
-    load_uap_samples,
-)
+from scripts.wheels.attacks import SAM2ForwardHelper
+from scripts.wheels.trainer import EvaluationSummary, UniversalPatchTrainer, load_uap_samples
+from scripts.wheels.utils import compute_perturbation_norms, ensure_dir
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = PROJECT_ROOT / "configs" / "sam2_hiera_s.yaml"

@@ -25,7 +25,17 @@ if __package__ is None:  # pragma: no cover - 兼容直接执行
 
 from sam2.build_sam import build_sam2_video_predictor
 
-from scripts.sam2_attack_utils import (
+from scripts.wheels.attacks import SAM2ForwardHelper
+from scripts.wheels.trainer import (
+    AggregateMetrics,
+    SampleEvaluation,
+    StepRecord,
+    UAPSample,
+    UniversalPatchTrainer,
+    load_uap_samples,
+    match_sample,
+)
+from scripts.wheels.utils import (
     AttackConfig,
     AttackLogger,
     AttackSummary,
@@ -35,16 +45,6 @@ from scripts.sam2_attack_utils import (
     restore_image_tensor,
     save_perturbation_image,
     save_rgb_tensor,
-)
-from scripts.uap_attacks import SAM2ForwardHelper
-from scripts.uap_patch_trainer import (
-    AggregateMetrics,
-    SampleEvaluation,
-    StepRecord,
-    UAPSample,
-    UniversalPatchTrainer,
-    load_uap_samples,
-    match_sample,
 )
 
 # 项目路径
