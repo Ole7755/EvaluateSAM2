@@ -22,6 +22,7 @@
 - `scripts/run_uap_attack.py`：首帧像素级对抗攻击入口，支持 FGSM / PGD / BIM / C&W，可同时记录干净基线和攻击后指标。
 - `scripts/run_attacks_batch.sh`：批量跑完整个序列列表和四种攻击的 Bash 脚本，内置 metrics 跳过机制。
 - `scripts/sam2tutorial.py`：单张图片的交互式示例。
+- `scripts/train_universal_patch.py`：多序列联合训练通用补丁的入口脚本，支持 FGSM / PGD / BIM / C&W，输出日志与可视化。
 
 脚本用法
 ------
@@ -104,3 +105,11 @@
 - **多类型攻击**：探索提示级扰动、混合攻击或多帧攻击手段，分析 propagate 阶段的脆弱点。
 - **自动化评估**：批量汇总 `logs/` 与 `outputs/`，生成 per-attack/per-sequence 报告（首帧 + 全视频指标）。
 - **传播研究**：评估首帧扰动对后续帧的影响，必要时设计跨帧 UAP 以破坏长期跟踪。
+
+近期计划 —— UAP 通用对抗补丁
+------
+- **数据准备**：挑选 2~3 个 DAVIS 序列构成训练集，并预留若干序列做验证；统一缓存首帧图像、掩码及尺寸信息，减少重复预处理的开销。
+- **训练框架**：实现 `UniversalPatchTrainer`，维护一个可学习的补丁张量，对每个样本应用补丁后通过 `SAM2ForwardHelper` 前向，累积梯度并在每步后做 `[-ε, ε]` 投影与像素裁剪。
+- **攻击算法**：基于现有 FGSM、PGD、BIM、C&W 攻击实现补丁更新流程；FGSM 单步聚合梯度，PGD/BIM 多步迭代（PGD 支持随机初始化），C&W 使用 Adam 与二分搜索平衡常数并附加 L∞ 约束。
+- **日志与可视化**：在 `outputs/uap/<attack>/` 保存补丁、干净/对抗对比图，在 `logs/uap/<attack>/metrics.csv` 记录每个序列的 clean/adv IoU、Dice、ΔIoU 及扰动范数。
+- **评估步骤**：先在训练序列上验证补丁有效，再迁移至验证序列检验跨序列泛化；同时对比 clean baseline，分析不同攻击的性能差异并据此调整超参数。
