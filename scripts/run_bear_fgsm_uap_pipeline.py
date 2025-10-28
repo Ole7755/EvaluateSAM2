@@ -20,19 +20,26 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
+import sys
 import torch
 
 from sam2.build_sam import build_sam2_video_predictor
-
-import sys
 
 
 if __package__ is None:  # 兼容直接以 python 执行脚本
     sys.path.append(str(Path(__file__).resolve().parent.parent))
 
+from scripts.run_uap_attack import (  # noqa: E402
+    find_frame_path,
+    normalize_masks,
+    normalize_object_ids,
+)
 from scripts.sam2_attack_utils import (  # noqa: E402
     compute_perturbation_norms,
+    eval_masks_numpy,
     ensure_dir,
+    load_mask_tensor,
+    mask_to_binary,
     save_perturbation_image,
 )
 from scripts.uap_attacks import SAM2ForwardHelper
@@ -80,6 +87,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--keep-aspect-ratio", action="store_true", help="保持宽高比缩放。")
     parser.add_argument("--mask-threshold", type=float, default=0.5, help="概率转掩码阈值。")
     parser.add_argument("--loss-type", choices=("dice", "bce"), default="dice", help="训练损失类型。")
+    parser.add_argument("--obj-id", type=int, default=1, help="目标对象 ID，用于官方 baseline。")
     parser.add_argument("--device", type=str, default="cuda", help="运行设备。")
     parser.add_argument(
         "--test-sequences",
@@ -197,6 +205,73 @@ def history_to_list(history: Sequence[StepRecord]) -> List[Dict[str, object]]:
     ]
 
 
+def compute_clean_baseline(
+    predictor,
+    sequence: str,
+    frame_token: str,
+    obj_id: int,
+    mask_subdir: str,
+    gt_label: Optional[int],
+    mask_threshold: float,
+    device: torch.device,
+) -> Dict[str, object]:
+    rgb_dir = DATA_ROOT / "JPEGImages" / "480p" / sequence
+    if not rgb_dir.exists():
+        raise FileNotFoundError(f"RGB 目录不存在：{rgb_dir}")
+
+    mask_dir = DATA_ROOT / mask_subdir / "480p" / sequence
+    if not mask_dir.exists():
+        raise FileNotFoundError(f"掩码目录不存在：{mask_dir}")
+
+    frame_path = find_frame_path(rgb_dir, frame_token)
+    mask_path = mask_dir / f"{frame_token}.png"
+    if not mask_path.exists():
+        raise FileNotFoundError(f"未找到掩码：{mask_path}")
+
+    raw_mask = load_mask_tensor(mask_path, device=device)
+    binary_mask = mask_to_binary(raw_mask, label=gt_label)
+    gt_mask_np = binary_mask.detach().cpu().numpy().astype(bool)
+
+    state = predictor.init_state(rgb_dir.as_posix())
+    try:
+        initial = predictor.add_new_mask(
+            state,
+            frame_idx=0,
+            obj_id=obj_id,
+            mask=binary_mask,
+        )
+    except TypeError:
+        initial = predictor.add_new_mask(
+            state,
+            frame_idx=0,
+            obj_id=obj_id,
+            mask_tensor=binary_mask,
+        )
+
+    _, object_ids, masks = initial
+    object_ids_list = normalize_object_ids(object_ids)
+    masks_list = normalize_masks(masks)
+
+    clean_mask = None
+    for oid, mask in zip(object_ids_list, masks_list):
+        if oid == obj_id:
+            clean_mask = mask
+            break
+    if clean_mask is None:
+        raise RuntimeError(f"未找到 obj_id={obj_id} 的预测掩码。")
+
+    clean_mask_np = (clean_mask.squeeze() > mask_threshold).detach().cpu().numpy().astype(bool)
+    clean_iou, clean_dice = eval_masks_numpy(clean_mask_np, gt_mask_np)
+
+    return {
+        "sequence": sequence,
+        "clean_iou": float(clean_iou),
+        "clean_dice": float(clean_dice),
+        "frame_path": frame_path.as_posix(),
+        "mask_path": mask_path.as_posix(),
+    }
+
+
 def main() -> None:
     args = parse_args()
     ensure_prerequisites()
@@ -244,6 +319,20 @@ def main() -> None:
 
     patch_norms = compute_perturbation_norms(patch)
 
+    try:
+        train_clean_baseline = compute_clean_baseline(
+            predictor=predictor,
+            sequence=train_sequence,
+            frame_token=args.frame_token,
+            obj_id=args.obj_id,
+            mask_subdir=args.mask_subdir,
+            gt_label=args.gt_label,
+            mask_threshold=args.mask_threshold,
+            device=device,
+        )
+    except Exception as exc:
+        train_clean_baseline = {"sequence": train_sequence, "error": str(exc)}
+
     if args.test_sequences:
         test_sequences = to_sequence_list(args.test_sequences)
     else:
@@ -270,6 +359,25 @@ def main() -> None:
     )
     eval_summary = eval_trainer.evaluate(patch, eval_samples, split="test")
 
+    eval_sequences_loaded = sorted({sample.sequence for sample in eval_samples})
+
+    test_clean_baseline: List[Dict[str, object]] = []
+    for seq in eval_sequences_loaded:
+        try:
+            baseline = compute_clean_baseline(
+                predictor=predictor,
+                sequence=seq,
+                frame_token=args.frame_token,
+                obj_id=args.obj_id,
+                mask_subdir=args.mask_subdir,
+                gt_label=args.gt_label,
+                mask_threshold=args.mask_threshold,
+                device=device,
+            )
+            test_clean_baseline.append(baseline)
+        except Exception as exc:
+            skipped_eval.append({"sequence": seq, "reason": f"baseline_failed: {exc}"})
+
     ensure_dir(args.output.parent)
     result = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -278,6 +386,7 @@ def main() -> None:
         "frame_token": args.frame_token,
         "mask_subdir": args.mask_subdir,
         "gt_label": args.gt_label,
+        "obj_id": args.obj_id,
         "epsilon": args.epsilon,
         "step_size": args.step_size,
         "input_size": args.input_size,
@@ -288,8 +397,10 @@ def main() -> None:
         "patch_tensor_path": patch_tensor_path.as_posix(),
         "patch_image_path": patch_image_path.as_posix(),
         "patch_norms": patch_norms,
-        "train_metrics": summary_to_dict(train_summary),
-        "test_metrics": summary_to_dict(eval_summary),
+        "train_metrics_surrogate": summary_to_dict(train_summary),
+        "train_clean_official": train_clean_baseline,
+        "test_metrics_surrogate": summary_to_dict(eval_summary),
+        "test_clean_official": test_clean_baseline,
         "skipped_sequences": skipped_train + skipped_eval,
         "history": history_to_list(history),
     }
