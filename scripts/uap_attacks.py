@@ -122,7 +122,7 @@ class FGSMAttack(BaseUAPAttack):
         adv = (image + delta).clamp(self.clip_min, self.clip_max)
         adv.requires_grad_(True)
 
-        output = helper.forward(adv)
+        output = helper.forward(adv, prompt_mask=target_mask)
         loss = self._loss(output.probs, target_mask)
         loss.backward()
 
@@ -154,7 +154,7 @@ class BIMAttack(BaseUAPAttack):
         for _ in range(self.steps):
             adv = (image + delta).clamp(self.clip_min, self.clip_max)
             adv.requires_grad_(True)
-            output = helper.forward(adv)
+            output = helper.forward(adv, prompt_mask=target_mask)
             loss = self._loss(output.probs, target_mask)
             loss.backward()
 
@@ -186,7 +186,7 @@ class PGDAttack(BaseUAPAttack):
         for _ in range(self.steps):
             adv = (image + delta).clamp(self.clip_min, self.clip_max)
             adv.requires_grad_(True)
-            output = helper.forward(adv)
+            output = helper.forward(adv, prompt_mask=target_mask)
             loss = self._loss(output.probs, target_mask)
             loss.backward()
 
@@ -268,7 +268,7 @@ class CarliniWagnerAttack(BaseUAPAttack):
             w.data = self._to_tanh_space(image)
             for _ in range(self.steps):
                 adv_image = self._from_tanh_space(w)
-                output = helper.forward(adv_image)
+                output = helper.forward(adv_image, prompt_mask=target_mask)
                 loss_adv = self._loss(output.probs, target_mask) - self.confidence
                 diff = adv_image - image
                 loss_dist = torch.sum(diff * diff)
