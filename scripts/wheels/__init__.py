@@ -49,7 +49,6 @@ from .dataset import (  # noqa: F401
     normalize_masks,
     normalize_object_ids,
 )
-from .pipeline import run_bear_uap_experiment  # noqa: F401
 
 __all__ = [
     # attacks
@@ -93,6 +92,5 @@ __all__ = [
     "find_frame_path",
     "normalize_object_ids",
     "normalize_masks",
-    # pipeline
-    "run_bear_uap_experiment",
+    # pipeline,
 ]
