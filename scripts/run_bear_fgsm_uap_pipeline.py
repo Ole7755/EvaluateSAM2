@@ -44,9 +44,11 @@ from scripts.sam2_attack_utils import (  # noqa: E402
 )
 from scripts.uap_attacks import SAM2ForwardHelper
 from scripts.uap_patch_trainer import (
+    AggregateMetrics,
     EvaluationSummary,
     StepRecord,
     UAPSample,
+    SampleEvaluation,
     UniversalPatchTrainer,
     load_uap_samples,
 )
@@ -205,6 +207,36 @@ def history_to_list(history: Sequence[StepRecord]) -> List[Dict[str, object]]:
     ]
 
 
+def apply_clean_overrides(
+    summary: EvaluationSummary,
+    clean_metrics: Dict[str, Dict[str, float]],
+) -> EvaluationSummary:
+    if not summary.samples or not clean_metrics:
+        return summary
+
+    updated_samples: List[SampleEvaluation] = []
+    for sample in summary.samples:
+        override = clean_metrics.get(sample.sequence)
+        if override is not None:
+            clean_iou = float(override.get("clean_iou", sample.clean_iou))
+            clean_dice = float(override.get("clean_dice", sample.clean_dice))
+            sample.clean_iou = clean_iou
+            sample.clean_dice = clean_dice
+            sample.delta_iou = clean_iou - sample.adv_iou
+            sample.delta_dice = clean_dice - sample.adv_dice
+        updated_samples.append(sample)
+
+    split_name = updated_samples[0].split if updated_samples else summary.aggregate.split if summary.aggregate else "eval"
+    try:
+        aggregate = AggregateMetrics.from_samples(split_name, updated_samples)
+    except Exception:
+        aggregate = summary.aggregate
+
+    summary.samples = updated_samples
+    summary.aggregate = aggregate
+    return summary
+
+
 def compute_clean_baseline(
     predictor,
     sequence: str,
@@ -333,6 +365,17 @@ def main() -> None:
     except Exception as exc:
         train_clean_baseline = {"sequence": train_sequence, "error": str(exc)}
 
+    if "clean_iou" in train_clean_baseline:
+        train_summary = apply_clean_overrides(
+            train_summary,
+            {
+                train_sequence: {
+                    "clean_iou": train_clean_baseline["clean_iou"],
+                    "clean_dice": train_clean_baseline["clean_dice"],
+                }
+            },
+        )
+
     if args.test_sequences:
         test_sequences = to_sequence_list(args.test_sequences)
     else:
@@ -378,6 +421,14 @@ def main() -> None:
         except Exception as exc:
             skipped_eval.append({"sequence": seq, "reason": f"baseline_failed: {exc}"})
 
+    if test_clean_baseline:
+        clean_override_map = {
+            item["sequence"]: {"clean_iou": item["clean_iou"], "clean_dice": item["clean_dice"]}
+            for item in test_clean_baseline
+            if "clean_iou" in item
+        }
+        eval_summary = apply_clean_overrides(eval_summary, clean_override_map)
+
     ensure_dir(args.output.parent)
     result = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -397,9 +448,9 @@ def main() -> None:
         "patch_tensor_path": patch_tensor_path.as_posix(),
         "patch_image_path": patch_image_path.as_posix(),
         "patch_norms": patch_norms,
-        "train_metrics_surrogate": summary_to_dict(train_summary),
+        "train_metrics": summary_to_dict(train_summary),
         "train_clean_official": train_clean_baseline,
-        "test_metrics_surrogate": summary_to_dict(eval_summary),
+        "test_metrics": summary_to_dict(eval_summary),
         "test_clean_official": test_clean_baseline,
         "skipped_sequences": skipped_train + skipped_eval,
         "history": history_to_list(history),
