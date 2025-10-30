@@ -9,7 +9,7 @@ from PIL import Image
 
 
 def load_mask(path: Path, threshold: float = 0.0, label: Optional[int] = None) -> np.ndarray:
-    """Load a mask image and return a binary array."""
+    """Load a mask image and return a boolean array."""
     array = np.array(Image.open(path))
     if array.ndim == 3:
         array = array[..., 0]

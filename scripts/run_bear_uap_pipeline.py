@@ -359,10 +359,10 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         mask_threshold=args.mask_threshold,
     )
     patch, history = trainer.train(
-        attack=args.attack,
         steps=args.steps,
         step_size=args.step_size,
         random_start=args.random_start,
+        attack_type=args.attack,
         cw_confidence=args.cw_confidence,
         cw_binary_steps=args.cw_binary_steps,
         cw_lr=args.cw_lr,

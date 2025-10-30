@@ -1,10 +1,10 @@
 """
-通用对抗补丁训练的辅助模块。
+Universal adversarial patch trainer utilities.
 
-核心功能：
-- 读取指定 DAVIS 序列的首帧与掩码，并完成与模型一致的预处理；
-- 基于多个样本求解 universal patch，支持 FGSM / PGD / BIM / C&W 风格的更新；
-- 评估补丁在训练/验证集上的净效（IoU / Dice），输出详细记录。
+The implementation keeps our original training pipeline while incorporating
+ideas from the cross-prompt SAM2 attack reference (“Vanish into Thin Air...”):
+reusable resize metadata, batched prompt handling via ``SAM2ForwardHelper`` and
+consistent metrics tracking.
 """
 
 from __future__ import annotations
@@ -19,8 +19,8 @@ import torch
 from .sam2_attack_utils import (
     ResizePadInfo,
     bce_loss,
+    compute_clean_adv_metrics,
     dice_loss,
-    eval_masks_numpy,
     load_mask_tensor,
     load_rgb_tensor,
     mask_probs_to_numpy,
@@ -36,7 +36,7 @@ _FRAME_EXTENSIONS = [".jpg", ".png", ".jpeg", ".JPG", ".PNG"]
 
 @dataclass
 class UAPSample:
-    """记录单个序列首帧的必要信息。"""
+    """Per-sequence sample used for universal patch optimisation."""
 
     sequence: str
     frame_token: str
@@ -51,7 +51,7 @@ class UAPSample:
 
 @dataclass
 class StepRecord:
-    """单次补丁更新的统计信息。"""
+    """Statistics for one optimisation step."""
 
     step: int
     loss: float
@@ -60,7 +60,7 @@ class StepRecord:
 
 @dataclass
 class SampleEvaluation:
-    """评估阶段的逐样本指标。"""
+    """Per-sample evaluation metrics."""
 
     split: str
     sequence: str
@@ -77,7 +77,7 @@ class SampleEvaluation:
 
 @dataclass
 class AggregateMetrics:
-    """集合层面的指标统计。"""
+    """Aggregate metrics for a set of sample evaluations."""
 
     split: str
     num_samples: int
@@ -111,7 +111,7 @@ class AggregateMetrics:
     @classmethod
     def from_samples(cls, split: str, samples: Sequence[SampleEvaluation]) -> AggregateMetrics:
         if not samples:
-            raise ValueError("samples 不能为空。")
+            raise ValueError("samples must not be empty.")
         num = len(samples)
         clean_iou_vals = [item.clean_iou for item in samples]
         adv_iou_vals = [item.adv_iou for item in samples]
@@ -137,7 +137,7 @@ class AggregateMetrics:
 
 @dataclass
 class EvaluationSummary:
-    """评估阶段的综合返回值。"""
+    """Return type for evaluation."""
 
     samples: List[SampleEvaluation]
     aggregate: Optional[AggregateMetrics]
@@ -148,7 +148,7 @@ def _find_frame_path(rgb_dir: Path, frame_token: str) -> Path:
         candidate = rgb_dir / f"{frame_token}{ext}"
         if candidate.exists():
             return candidate
-    raise FileNotFoundError(f"序列 {rgb_dir.parent.name} 的帧 {frame_token} 未找到。")
+    raise FileNotFoundError(f"Frame {frame_token} not found under {rgb_dir}.")
 
 
 def load_uap_samples(
@@ -168,15 +168,15 @@ def load_uap_samples(
     for seq in sequences:
         rgb_dir = data_root / "JPEGImages" / "480p" / seq
         if not rgb_dir.exists():
-            raise FileNotFoundError(f"RGB 目录不存在：{rgb_dir}")
+            raise FileNotFoundError(f"RGB directory missing: {rgb_dir}")
         mask_dir = data_root / mask_subdir / "480p" / seq
         if not mask_dir.exists():
-            raise FileNotFoundError(f"首帧掩码目录不存在：{mask_dir}")
+            raise FileNotFoundError(f"Mask directory missing: {mask_dir}")
 
         frame_path = _find_frame_path(rgb_dir, frame_token)
         mask_path = mask_dir / f"{frame_token}.png"
         if not mask_path.exists():
-            raise FileNotFoundError(f"序列 {seq} 的掩码缺失：{mask_path}")
+            raise FileNotFoundError(f"Mask missing: {mask_path}")
 
         image_tensor = load_rgb_tensor(frame_path, device=device)
         mask_tensor = load_mask_tensor(mask_path, device=device)
@@ -203,8 +203,20 @@ def load_uap_samples(
     return samples
 
 
+def match_sample(
+    samples: Iterable[UAPSample],
+    sequence: str,
+    frame_token: str,
+) -> Optional[UAPSample]:
+    """Search cached samples by sequence and frame token."""
+    for sample in samples:
+        if sample.sequence == sequence and sample.frame_token == frame_token:
+            return sample
+    return None
+
+
 class UniversalPatchTrainer:
-    """针对多序列首帧优化通用补丁的训练器。"""
+    """Train universal patches across multiple sequences."""
 
     def __init__(
         self,
@@ -215,13 +227,13 @@ class UniversalPatchTrainer:
         mask_threshold: float = 0.5,
     ) -> None:
         if not samples:
-            raise ValueError("samples 不能为空。")
+            raise ValueError("samples must not be empty.")
         if loss_type not in {"dice", "bce"}:
-            raise ValueError("loss_type 仅支持 dice 或 bce。")
+            raise ValueError("loss_type must be one of {'dice', 'bce'}.")
 
         self.helper = helper
-        self.samples = list(samples)
         self.device = helper.device
+        self.samples = list(samples)
         self.epsilon = float(epsilon)
         self.mask_threshold = float(mask_threshold)
         self.loss_type = loss_type
@@ -232,7 +244,6 @@ class UniversalPatchTrainer:
             param.requires_grad_(False)
 
     def _loss_with_patch(self, patch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """返回平均损失与逐样本损失。"""
         losses: List[torch.Tensor] = []
         for sample in self.samples:
             clean = sample.resized_image.unsqueeze(0)
@@ -259,46 +270,50 @@ class UniversalPatchTrainer:
 
     def train(
         self,
-        attack: str,
         steps: int,
         step_size: float,
         random_start: bool = False,
+        attack_type: str = "pgd",
+        cw_lr: float = 0.01,
         cw_confidence: float = 0.0,
         cw_binary_steps: int = 5,
-        cw_lr: float = 0.01,
     ) -> Tuple[torch.Tensor, List[StepRecord]]:
-        attack = attack.lower()
-        if attack not in {"fgsm", "pgd", "bim", "cw"}:
-            raise ValueError(f"未知攻击类型：{attack}")
-        if attack != "fgsm" and steps <= 0:
-            raise ValueError("迭代攻击的 steps 需为正整数。")
-
-        history: List[StepRecord] = []
-
-        if attack == "cw":
-            patch, history = self._train_cw(
+        attack_type = attack_type.lower()
+        if attack_type == "cw":
+            return self._train_cw(
                 steps=steps,
                 lr=cw_lr,
                 confidence=cw_confidence,
-                binary_steps=max(int(cw_binary_steps), 1),
+                binary_steps=cw_binary_steps,
             )
-            return patch.clamp(-self.epsilon, self.epsilon).detach(), history
+        if attack_type in {"pgd", "bim", "fgsm"}:
+            return self._train_iterative(
+                steps=steps,
+                step_size=step_size,
+                random_start=random_start,
+                attack_type=attack_type,
+            )
+        raise ValueError(f"Unsupported attack_type: {attack_type}")
 
-        patch = self._init_patch(random_start if attack == "pgd" else False)
-        step_size = float(step_size) if step_size > 0 else self.epsilon
+    def _train_iterative(
+        self,
+        steps: int,
+        step_size: float,
+        random_start: bool,
+        attack_type: str,
+    ) -> Tuple[torch.Tensor, List[StepRecord]]:
+        patch = self._init_patch(random_start)
 
-        if attack == "fgsm":
-            grad, loss, per_sample = self._compute_gradient(patch)
-            update = step_size * torch.sign(grad)
-            patch = torch.clamp(patch + update, -self.epsilon, self.epsilon).detach()
-            history.append(StepRecord(step=0, loss=loss, per_sample_losses=per_sample))
-            return patch, history
+        patch = torch.clamp(patch, -self.epsilon, self.epsilon).detach()
+        history: List[StepRecord] = []
 
         for idx in range(int(steps)):
             grad, loss, per_sample = self._compute_gradient(patch)
+            if attack_type == "fgsm" and idx > 0:
+                break
             update = step_size * torch.sign(grad)
             patch = torch.clamp(patch + update, -self.epsilon, self.epsilon).detach()
-            history.append(StepRecord(step=idx, loss=loss, per_sample_losses=per_sample))
+            history.append(StepRecord(step=idx, loss=loss, per_sample_losses=list(per_sample)))
 
         return patch, history
 
@@ -309,10 +324,6 @@ class UniversalPatchTrainer:
         confidence: float,
         binary_steps: int,
     ) -> Tuple[torch.Tensor, List[StepRecord]]:
-        """
-        简化版 C&W 优化：采用 w → tanh 映射确保补丁在 [-ε, ε] 范围内，
-        使用 Adam 进行更新，并对常数项做二分调整。
-        """
         w = torch.zeros((1, 3, self.target_size, self.target_size), device=self.device, requires_grad=True)
         const_lower = torch.tensor(0.0, device=self.device)
         const_upper = torch.tensor(1e4, device=self.device)
@@ -382,26 +393,25 @@ class UniversalPatchTrainer:
             clean_mask_np = mask_probs_to_numpy(
                 clean_out.probs, sample.resize_info, sample.orig_hw, self.mask_threshold
             )
-            clean_iou, clean_dice = eval_masks_numpy(clean_mask_np, sample.gt_mask)
 
             adv = torch.clamp(clean + patch, 0.0, 1.0)
             adv_out = self.helper.forward(adv, prompt_mask=sample.resized_mask)
             adv_mask_np = mask_probs_to_numpy(
                 adv_out.probs, sample.resize_info, sample.orig_hw, self.mask_threshold
             )
-            adv_iou, adv_dice = eval_masks_numpy(adv_mask_np, sample.gt_mask)
 
+            metrics = compute_clean_adv_metrics(clean_mask_np, adv_mask_np, sample.gt_mask)
             records.append(
                 SampleEvaluation(
                     split=split,
                     sequence=sample.sequence,
                     frame_token=sample.frame_token,
-                    clean_iou=float(clean_iou),
-                    clean_dice=float(clean_dice),
-                    adv_iou=float(adv_iou),
-                    adv_dice=float(adv_dice),
-                    delta_iou=float(clean_iou - adv_iou),
-                    delta_dice=float(clean_dice - adv_dice),
+                    clean_iou=float(metrics["clean_iou"]),
+                    clean_dice=float(metrics["clean_dice"]),
+                    adv_iou=float(metrics["adv_iou"]),
+                    adv_dice=float(metrics["adv_dice"]),
+                    delta_iou=float(metrics["delta_iou"]),
+                    delta_dice=float(metrics["delta_dice"]),
                     frame_path=str(sample.frame_path),
                     mask_path=str(sample.mask_path),
                 )
@@ -409,15 +419,3 @@ class UniversalPatchTrainer:
 
         aggregate = AggregateMetrics.from_samples(split, records)
         return EvaluationSummary(samples=records, aggregate=aggregate)
-
-
-def match_sample(
-    samples: Iterable[UAPSample],
-    sequence: str,
-    frame_token: str,
-) -> Optional[UAPSample]:
-    """根据序列与帧编号在缓存中查找样本。"""
-    for sample in samples:
-        if sample.sequence == sequence and sample.frame_token == frame_token:
-            return sample
-    return None

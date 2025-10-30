@@ -14,9 +14,8 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
-import numpy as np
 import torch
 from PIL import Image
 
@@ -127,53 +126,60 @@ def write_metrics_csv(path: Path, metrics: Sequence[SampleEvaluation]) -> None:
         "sequence",
         "frame_token",
         "clean_iou",
-        "adv_iou",
-        "delta_iou",
         "clean_dice",
+        "adv_iou",
         "adv_dice",
+        "delta_iou",
         "delta_dice",
         "frame_path",
         "mask_path",
     ]
     with path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=headers)
-        writer.writeheader()
+        writer = csv.writer(f)
+        writer.writerow(headers)
         for item in metrics:
             writer.writerow(
-                {
-                    "split": item.split,
-                    "sequence": item.sequence,
-                    "frame_token": item.frame_token,
-                    "clean_iou": f"{item.clean_iou:.6f}",
-                    "adv_iou": f"{item.adv_iou:.6f}",
-                    "delta_iou": f"{item.delta_iou:.6f}",
-                    "clean_dice": f"{item.clean_dice:.6f}",
-                    "adv_dice": f"{item.adv_dice:.6f}",
-                    "delta_dice": f"{item.delta_dice:.6f}",
-                    "frame_path": item.frame_path,
-                    "mask_path": item.mask_path,
-                }
+                [
+                    item.split,
+                    item.sequence,
+                    item.frame_token,
+                    f"{item.clean_iou:.6f}",
+                    f"{item.clean_dice:.6f}",
+                    f"{item.adv_iou:.6f}",
+                    f"{item.adv_dice:.6f}",
+                    f"{item.delta_iou:.6f}",
+                    f"{item.delta_dice:.6f}",
+                    item.frame_path,
+                    item.mask_path,
+                ]
             )
 
 
-def save_aggregate_json(path: Path, aggregates: Sequence[AggregateMetrics]) -> None:
-    ensure_dir(path.parent)
-    payload = [agg.to_dict() for agg in aggregates]
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
+def history_to_list(history: Sequence[StepRecord]) -> List[Dict[str, object]]:
+    return [
+        {"step": record.step, "loss": record.loss, "per_sample_losses": record.per_sample_losses}
+        for record in history
+    ]
+
+
+def summary_to_dict(summary: Optional[AggregateMetrics]) -> Optional[Dict[str, object]]:
+    return summary.to_dict() if summary else None
 
 
 def save_training_history(path: Path, history: Sequence[StepRecord]) -> None:
     ensure_dir(path.parent)
-    payload = [
-        {"step": record.step, "loss": record.loss, "per_sample_losses": record.per_sample_losses}
-        for record in history
-    ]
+    payload = history_to_list(history)
     with path.open("w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
 
-@torch.no_grad()
+def save_aggregate_json(path: Path, aggregates: Sequence[AggregateMetrics]) -> None:
+    ensure_dir(path.parent)
+    payload = [item.to_dict() for item in aggregates]
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+
 def save_visuals(
     trainer: UniversalPatchTrainer,
     patch: torch.Tensor,
@@ -182,41 +188,25 @@ def save_visuals(
     split: str,
     limit: Optional[int],
 ) -> None:
-    if not samples:
-        return
     ensure_dir(output_dir)
-    patch = patch.to(trainer.device)
-    for idx, sample in enumerate(samples):
-        if limit is not None and idx >= limit:
-            break
-        prefix = f"{split}_{sample.sequence}_{sample.frame_token}"
+    selected = samples if limit is None or limit < 0 else samples[:limit]
+    for sample in selected:
         clean = sample.resized_image.unsqueeze(0)
         adv = torch.clamp(clean + patch, 0.0, 1.0)
-
         clean_out = trainer.helper.forward(clean, prompt_mask=sample.resized_mask)
         adv_out = trainer.helper.forward(adv, prompt_mask=sample.resized_mask)
 
-        clean_mask_np = mask_probs_to_numpy(
-            clean_out.probs, sample.resize_info, sample.orig_hw, trainer.mask_threshold
-        )
-        adv_mask_np = mask_probs_to_numpy(
-            adv_out.probs, sample.resize_info, sample.orig_hw, trainer.mask_threshold
-        )
+        clean_mask = mask_probs_to_numpy(clean_out.probs, sample.resize_info, sample.orig_hw, trainer.mask_threshold)
+        adv_mask = mask_probs_to_numpy(adv_out.probs, sample.resize_info, sample.orig_hw, trainer.mask_threshold)
 
-        clean_vis = restore_image_tensor(clean, sample.resize_info, sample.orig_hw).squeeze(0)
-        adv_vis = restore_image_tensor(adv, sample.resize_info, sample.orig_hw).squeeze(0)
-        perturb_vis = restore_image_tensor(
-            (adv - clean).detach(), sample.resize_info, sample.orig_hw
-        ).squeeze(0)
+        clean_img = restore_image_tensor(clean, sample.resize_info, sample.orig_hw).squeeze(0).detach()
+        adv_img = restore_image_tensor(adv, sample.resize_info, sample.orig_hw).squeeze(0).detach()
 
-        save_rgb_tensor(clean_vis, output_dir / f"{prefix}_clean.png")
-        save_rgb_tensor(adv_vis, output_dir / f"{prefix}_adv.png")
-        save_perturbation_image(perturb_vis, output_dir / f"{prefix}_perturbation.png")
-
-        clean_mask_img = (clean_mask_np.astype(np.uint8) * 255)
-        adv_mask_img = (adv_mask_np.astype(np.uint8) * 255)
-        Image.fromarray(clean_mask_img).save(output_dir / f"{prefix}_clean_mask.png")
-        Image.fromarray(adv_mask_img).save(output_dir / f"{prefix}_adv_mask.png")
+        base = f"{sample.sequence}_{sample.frame_token}_{split}"
+        save_rgb_tensor(clean_img, output_dir / f"{base}_clean.png")
+        save_rgb_tensor(adv_img, output_dir / f"{base}_adv.png")
+        Image.fromarray((clean_mask.astype(float) * 255).astype("uint8")).save(output_dir / f"{base}_clean_mask.png")
+        Image.fromarray((adv_mask.astype(float) * 255).astype("uint8")).save(output_dir / f"{base}_adv_mask.png")
 
 
 def log_per_sample_summaries(
@@ -228,33 +218,30 @@ def log_per_sample_summaries(
     obj_id: int,
     gt_label: Optional[int],
 ) -> None:
-    for item in evaluations:
-        sample = match_sample(samples, item.sequence, item.frame_token)
-        if sample is None:
+    eval_map = {(item.sequence, item.frame_token): item for item in evaluations}
+    patch_norms = compute_perturbation_norms(patch)
+    for sample in samples:
+        key = (sample.sequence, sample.frame_token)
+        if key not in eval_map:
             continue
-        clean = sample.resized_image.unsqueeze(0)
-        adv = torch.clamp(clean + patch, 0.0, 1.0)
-        perturbation = adv - clean
-        norms = compute_perturbation_norms(perturbation)
-
+        metrics = eval_map[key]
         summary = AttackSummary(
             attack_name=attack_name,
-            sequence=item.sequence,
-            frame_idx=safe_int(item.frame_token),
+            sequence=sample.sequence,
+            frame_idx=safe_int(sample.frame_token),
             obj_id=obj_id,
             gt_label=gt_label,
-            clean_iou=item.clean_iou,
-            clean_dice=item.clean_dice,
-            adv_iou=item.adv_iou,
-            adv_dice=item.adv_dice,
-            perturbation_norm=norms,
+            clean_iou=metrics.clean_iou,
+            clean_dice=metrics.clean_dice,
+            adv_iou=metrics.adv_iou,
+            adv_dice=metrics.adv_dice,
+            perturbation_norm=patch_norms,
         )
         logger.save_summary(
             summary,
             extra={
-                "split": item.split,
-                "frame_path": item.frame_path,
-                "mask_path": item.mask_path,
+                "frame_path": sample.frame_path.as_posix(),
+                "mask_path": sample.mask_path.as_posix(),
             },
         )
 
@@ -304,10 +291,10 @@ def main() -> None:
     )
 
     patch, history = trainer.train(
-        attack=args.attack,
         steps=args.steps,
         step_size=args.step_size,
         random_start=args.random_start,
+        attack_type=args.attack,
         cw_confidence=args.cw_confidence,
         cw_binary_steps=args.cw_binary_steps,
         cw_lr=args.cw_lr,

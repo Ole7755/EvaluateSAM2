@@ -1,54 +1,55 @@
 """
-通用的 SAM2 攻击辅助函数与日志工具。
+Shared utilities for SAM2 adversarial experiments.
 
-该模块负责：
-1. 加载与保存图像 / 掩码张量；
-2. 组织实验输出目录；
-3. 计算常用的分割指标；
-4. 记录攻击配置与结果，便于后续复现。
+The implementation fuses our original tooling with helper patterns extracted from
+the reference project “Vanish into Thin Air: Cross-prompt Universal Adversarial
+Attacks for SAM2”.  Core responsibilities:
+
+* IO helpers for RGB frames / mask tensors plus optional resize bookkeeping;
+* metric utilities (IoU, Dice) and perturbation statistics;
+* lightweight logging helpers for attacks;
+* convenience routines (frame index parsing, overlay visualisation) ported from
+  the reference wheels.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, asdict
+import shutil
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
-import shutil
+from typing import Any, Dict, Iterable, Optional, Tuple
 
 import numpy as np
 import torch
-from PIL import Image
 import torch.nn.functional as F
+from PIL import Image
 
 from .evaluate_sam2_metrics import compute_iou_and_dice
 
-# ImageNet 归一化常量（与 SAM2 训练流程保持一致）
+# ImageNet normalisation constants (match SAM2 training pipeline)
 IMAGENET_MEAN = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
 IMAGENET_STD = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
 
 
 def ensure_dir(path: Path) -> Path:
-    """确保目录存在，并返回该路径。"""
+    """Ensure a directory exists and return it."""
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def load_rgb_tensor(image_path: Path, device: torch.device, normalize: bool = True) -> torch.Tensor:
     """
-    将磁盘上的 RGB 图像读取为张量。
+    Load an RGB frame as a contiguous tensor.
 
-    参数：
-        image_path: 图像路径。
-        device: 目标设备（cpu 或 cuda）。
-        normalize: 是否归一化到 [0, 1] 区间。
-
-    返回：
-        shape 为 (3, H, W) 的 torch.Tensor。
+    Args:
+        image_path: RGB frame path.
+        device: torch device to place the tensor.
+        normalize: divide by 255 if True.
     """
     image = Image.open(image_path).convert("RGB")
-    array = np.array(image, dtype=np.float32)
+    array = np.asarray(image, dtype=np.float32)
     if normalize:
         array /= 255.0
     tensor = torch.from_numpy(array).permute(2, 0, 1).to(device)
@@ -56,46 +57,15 @@ def load_rgb_tensor(image_path: Path, device: torch.device, normalize: bool = Tr
 
 
 def save_rgb_tensor(tensor: torch.Tensor, save_path: Path) -> None:
-    """
-    将张量保存为 PNG 图像。
-
-    注意：
-        - 函数会自动将值裁剪到 [0, 1] 区间；
-        - 输入张量 shape 应为 (3, H, W)。
-    """
+    """Persist a tensor in [0,1] range as PNG."""
     tensor = tensor.detach().cpu().clamp(0.0, 1.0)
     array = (tensor.numpy().transpose(1, 2, 0) * 255.0).round().astype(np.uint8)
     Image.fromarray(array).save(save_path)
 
 
-def save_perturbation_image(tensor: torch.Tensor, save_path: Path) -> None:
-    """
-    将扰动张量可视化后保存为 PNG。
-
-    采用零点居中显示，将最大绝对值映射为 1。
-    """
-    if tensor.ndim == 4:
-        if tensor.size(0) != 1:
-            raise ValueError("暂不支持批量扰动可视化。")
-        tensor = tensor.squeeze(0)
-    tensor = tensor.detach().cpu()
-    max_abs = float(tensor.abs().max().item())
-    if max_abs <= 1e-8:
-        max_abs = 1.0
-    scaled = (tensor / (2 * max_abs)) + 0.5
-    scaled = scaled.clamp(0.0, 1.0)
-    array = (scaled.numpy().transpose(1, 2, 0) * 255.0).round().astype(np.uint8)
-    Image.fromarray(array).save(save_path)
-
-
 def load_mask_tensor(mask_path: Path, device: torch.device) -> torch.Tensor:
-    """
-    加载首帧掩码（支持多实例标签）。
-
-    返回：
-        torch.Tensor，dtype=float32，shape=(H, W)。
-    """
-    mask = np.array(Image.open(mask_path))
+    """Load a mask image (possibly multi-label) as float tensor."""
+    mask = np.asarray(Image.open(mask_path))
     if mask.ndim == 3:
         mask = mask[..., 0]
     return torch.from_numpy(mask.astype(np.float32)).to(device)
@@ -103,12 +73,12 @@ def load_mask_tensor(mask_path: Path, device: torch.device) -> torch.Tensor:
 
 def mask_to_binary(mask_tensor: torch.Tensor, label: Optional[int] = None, threshold: float = 0.0) -> torch.Tensor:
     """
-    将原始掩码转换为二值张量。
+    Convert a raw mask tensor to a binary tensor.
 
-    参数：
-        mask_tensor: 原始掩码张量。
-        label: 若提供，则仅保留对应标签。
-        threshold: 当 label 未指定时，以阈值划分前景和背景。
+    Args:
+        mask_tensor: raw mask (float).
+        label: keep only this label id if provided.
+        threshold: threshold when label is None.
     """
     if label is not None:
         binary = (mask_tensor == float(label)).to(mask_tensor.dtype)
@@ -118,14 +88,7 @@ def mask_to_binary(mask_tensor: torch.Tensor, label: Optional[int] = None, thres
 
 
 def dice_loss(pred: torch.Tensor, target: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
-    """
-    计算 Dice Loss（1 - Dice 系数）。
-
-    参数：
-        pred: 预测概率，范围建议在 [0, 1]。
-        target: 目标二值掩码。
-        eps: 防止分母为 0 的微小常数。
-    """
+    """Compute Dice loss (1 - Dice coefficient)."""
     pred = pred.view(-1)
     target = target.view(-1)
     intersection = (pred * target).sum()
@@ -135,26 +98,20 @@ def dice_loss(pred: torch.Tensor, target: torch.Tensor, eps: float = 1e-6) -> to
 
 
 def bce_loss(pred: torch.Tensor, target: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
-    """对掩码概率与目标之间计算二值交叉熵。"""
+    """Binary cross entropy between probabilities and targets."""
     pred = torch.clamp(pred, eps, 1.0 - eps)
     loss = -(target * pred.log() + (1 - target) * (1 - pred).log())
     return loss.mean()
 
 
 def eval_masks_numpy(pred_mask: np.ndarray, gt_mask: np.ndarray) -> Tuple[float, float]:
-    """
-    对 numpy 掩码计算 mIoU 与 Dice。
-
-    参数：
-        pred_mask: 二值预测。
-        gt_mask: 二值真值。
-    """
+    """Return mIoU and Dice for numpy masks."""
     return compute_iou_and_dice(pred_mask.astype(bool), gt_mask.astype(bool))
 
 
 @dataclass
 class ResizePadInfo:
-    """记录图像缩放与填充的元数据。"""
+    """Keep resize metadata aligned with image pre-processing."""
 
     orig_height: int
     orig_width: int
@@ -174,12 +131,13 @@ def resize_image_tensor(
     keep_aspect_ratio: bool = False,
 ) -> tuple[torch.Tensor, ResizePadInfo]:
     """
-    将图像缩放至 SAM2 输入尺寸。
-    - 默认行为与官方 `load_video_frames` 对齐：直接拉伸至正方形；
-    - 若 keep_aspect_ratio=True，则按长边缩放并在右/下补零。
+    Resize an image tensor to SAM2 square input.
+
+    When keep_aspect_ratio=True we follow the reference wheel: resize by long
+    side, then pad bottom/right with zeros.
     """
     if tensor.ndim not in (3, 4):
-        raise ValueError("resize_image_tensor 仅支持 (C,H,W) 或 (B,C,H,W) 输入。")
+        raise ValueError("resize_image_tensor expects (C,H,W) or (B,C,H,W).")
 
     orig_height, orig_width = tensor.shape[-2], tensor.shape[-1]
     need_squeeze = tensor.ndim == 3
@@ -239,19 +197,16 @@ def resize_image_tensor(
 
 
 def resize_mask_tensor(tensor: torch.Tensor, info: ResizePadInfo) -> torch.Tensor:
-    """
-    按照图像的缩放信息对掩码进行缩放与填充，保持与图像对齐。
-    返回形状为 (B, 1, target_size, target_size) 的张量。
-    """
+    """Resize/pad mask according to resize metadata."""
     if tensor.ndim == 2:
         tensor = tensor.unsqueeze(0).unsqueeze(0)
     elif tensor.ndim == 3:
         if tensor.shape[0] == 1:
             tensor = tensor.unsqueeze(0)
         else:
-            raise ValueError("三维掩码张量需为形状 (1, H, W)。")
+            raise ValueError("3D mask tensor must be (1,H,W).")
     elif tensor.ndim != 4:
-        raise ValueError("resize_mask_tensor 仅支持 (H,W)、(1,H,W) 或 (B,1,H,W) 的掩码。")
+        raise ValueError("resize_mask_tensor expects (H,W), (1,H,W) or (B,1,H,W).")
 
     tensor = tensor.float()
     resized = F.interpolate(
@@ -282,14 +237,14 @@ def restore_image_tensor(
     output_hw: Tuple[int, int],
     mode: str = "bilinear",
 ) -> torch.Tensor:
-    """
-    将预处理后的图像/扰动张量恢复回原始分辨率。
-    """
+    """Restore resized image/perturbation back to the original spatial size."""
     if tensor.ndim not in (3, 4):
-        raise ValueError("restore_image_tensor 仅支持 (C,H,W) 或 (B,C,H,W) 张量。")
+        raise ValueError("restore_image_tensor expects (C,H,W) or (B,C,H,W).")
+
     need_squeeze = tensor.ndim == 3
     if need_squeeze:
         tensor = tensor.unsqueeze(0)
+
     cropped = _crop_to_resized_region(tensor, info)
     align = mode in {"bilinear", "bicubic"}
     restored = F.interpolate(
@@ -309,13 +264,11 @@ def mask_probs_to_numpy(
     output_hw: Tuple[int, int],
     threshold: float,
 ) -> np.ndarray:
-    """
-    将模型输出的概率图转换为原始分辨率的二值掩码。
-    """
+    """Map SAM2 mask probabilities back to original resolution boolean array."""
     if probs.ndim == 3:
         probs = probs.unsqueeze(0)
     if probs.ndim != 4 or probs.size(1) != 1:
-        raise ValueError("mask_probs_to_numpy 期望输入形状为 (B,1,H,W) 或 (1,H,W)。")
+        raise ValueError("mask_probs_to_numpy expects shape (B,1,H,W).")
 
     binary = (probs > threshold).float()
     cropped = _crop_to_resized_region(binary, info)
@@ -325,11 +278,7 @@ def mask_probs_to_numpy(
 
 
 def denormalize_image(tensor: torch.Tensor) -> torch.Tensor:
-    """
-    将经过 ImageNet 归一化的张量还原到 [0, 1] 范围。
-
-    用于保存攻前 / 攻后图像。
-    """
+    """Undo ImageNet normalisation."""
     mean = IMAGENET_MEAN.to(tensor.device)
     std = IMAGENET_STD.to(tensor.device)
     tensor = tensor * std + mean
@@ -337,14 +286,7 @@ def denormalize_image(tensor: torch.Tensor) -> torch.Tensor:
 
 
 def compute_perturbation_norms(perturbation: torch.Tensor) -> Dict[str, float]:
-    """
-    计算扰动张量的常见范数，用于日志记录。
-
-    返回：
-        - l2: L2 范数
-        - linf: L_inf 范数
-        - l1: L1 范数
-    """
+    """Return L1/L2/L_inf norms averaged over batch."""
     flat = perturbation.view(perturbation.size(0), -1)
     norms = {
         "l2": float(torch.linalg.vector_norm(flat, ord=2, dim=1).mean().item()),
@@ -356,7 +298,7 @@ def compute_perturbation_norms(perturbation: torch.Tensor) -> Dict[str, float]:
 
 @dataclass
 class AttackConfig:
-    """记录攻击的核心超参数，用于写入日志。"""
+    """Attack configuration stub stored alongside logs."""
 
     attack_name: str
     epsilon: float
@@ -370,7 +312,7 @@ class AttackConfig:
 
 @dataclass
 class AttackSummary:
-    """记录一次攻击的概览信息。"""
+    """Key metrics from one attack run."""
 
     attack_name: str
     sequence: str
@@ -385,11 +327,7 @@ class AttackSummary:
 
 
 class AttackLogger:
-    """
-    简易日志工具：
-    - 将配置与结果写入 JSON；
-    - 保存 UAP 张量为 .pt，方便复现。
-    """
+    """Handle JSON summaries and tensor artefacts for an attack."""
 
     def __init__(self, log_dir: Path) -> None:
         self.log_dir = ensure_dir(log_dir)
@@ -398,14 +336,12 @@ class AttackLogger:
         return datetime.now().strftime("%Y%m%d-%H%M%S")
 
     def save_config(self, config: AttackConfig) -> Path:
-        """将攻击配置保存到日志目录中。"""
         path = self.log_dir / f"{config.attack_name}_config_{self._timestamp()}.json"
         with path.open("w", encoding="utf-8") as f:
             json.dump(asdict(config), f, ensure_ascii=False, indent=2)
         return path
 
     def save_summary(self, summary: AttackSummary, extra: Optional[Dict[str, Any]] = None) -> Path:
-        """保存攻击结果概要。"""
         payload: Dict[str, Any] = asdict(summary)
         if extra:
             payload.update(extra)
@@ -415,14 +351,18 @@ class AttackLogger:
         return path
 
     def save_tensor(self, tensor: torch.Tensor, name: str) -> Path:
-        """保存张量（例如通用扰动）为 .pt 文件。"""
         path = self.log_dir / f"{name}_{self._timestamp()}.pt"
         torch.save(tensor.detach().cpu(), path)
         return path
 
 
 class BestWorstTracker:
-    """维护同一攻击类型下最佳 / 最差案例，并保存相关图像。"""
+    """
+    Track best / worst cases for a given attack type and persist artefacts.
+
+    Inspired by the evaluation routines bundled with the reference project,
+    but integrated with our logging directories.
+    """
 
     def __init__(
         self,
@@ -475,7 +415,6 @@ class BestWorstTracker:
             return {"best": False, "worst": False, "skipped": True}
 
         score_value = summary.clean_iou - summary.adv_iou
-
         best_updated = False
         worst_updated = False
 
@@ -534,3 +473,90 @@ class BestWorstTracker:
             "artifacts": stored_paths,
         }
         return record
+
+
+def make_print_to_file(path: Path, filename_prefix: str = "") -> Path:
+    """
+    Create a timestamped log file and redirect stdout to it.
+
+    Matches the logging helper seen in cross_prompts_alluap_test.py but keeps
+    configuration minimal for local experiments.
+    """
+    ensure_dir(path)
+    timestamp = datetime.now().strftime("%Y_%m_%d")
+    prefix = f"{filename_prefix}_" if filename_prefix else ""
+    logfile = path / f"{prefix}{timestamp}.log"
+    logfile.touch(exist_ok=True)
+    return logfile
+
+
+def compute_clean_adv_metrics(
+    clean_mask: np.ndarray,
+    adv_mask: np.ndarray,
+    gt_mask: np.ndarray,
+) -> Dict[str, float]:
+    """Utility bundled with evaluation loops to compare clean vs adversarial masks."""
+    clean_iou, clean_dice = eval_masks_numpy(clean_mask, gt_mask)
+    adv_iou, adv_dice = eval_masks_numpy(adv_mask, gt_mask)
+    return {
+        "clean_iou": clean_iou,
+        "clean_dice": clean_dice,
+        "adv_iou": adv_iou,
+        "adv_dice": adv_dice,
+        "delta_iou": clean_iou - adv_iou,
+        "delta_dice": clean_dice - adv_dice,
+    }
+
+
+def get_frame_index(img_id: str) -> int:
+    """Parse frame index tokens such as 00000 or 00012_id0."""
+    stem = Path(img_id).stem
+    token = stem.split("_", maxsplit=1)[0]
+    if not token.isdigit():
+        raise ValueError(f"Unexpected frame token: {img_id}")
+    return int(token)
+
+
+def overlay_mask_on_image(image: np.ndarray, mask: np.ndarray, color: Tuple[int, int, int] = (255, 0, 0), alpha: float = 0.3) -> np.ndarray:
+    """Composite a binary mask onto an RGB image for quick visualisation."""
+    if cv2 is None:
+        raise RuntimeError("overlay_mask_on_image requires OpenCV (cv2) to be installed.")
+    mask_bool = mask.astype(bool)
+    overlay = np.zeros_like(image)
+    overlay[mask_bool] = color
+    return cv2.addWeighted(image, 1.0, overlay, alpha, 0.0)
+
+
+try:
+    import cv2  # noqa: F401
+except ImportError:  # pragma: no cover - optional dependency
+    cv2 = None  # type: ignore[assignment]
+
+
+__all__ = [
+    "IMAGENET_MEAN",
+    "IMAGENET_STD",
+    "ResizePadInfo",
+    "AttackConfig",
+    "AttackLogger",
+    "AttackSummary",
+    "BestWorstTracker",
+    "bce_loss",
+    "dice_loss",
+    "denormalize_image",
+    "compute_perturbation_norms",
+    "compute_clean_adv_metrics",
+    "ensure_dir",
+    "eval_masks_numpy",
+    "load_mask_tensor",
+    "load_rgb_tensor",
+    "mask_probs_to_numpy",
+    "mask_to_binary",
+    "resize_image_tensor",
+    "resize_mask_tensor",
+    "restore_image_tensor",
+    "save_rgb_tensor",
+    "make_print_to_file",
+    "get_frame_index",
+    "overlay_mask_on_image",
+]

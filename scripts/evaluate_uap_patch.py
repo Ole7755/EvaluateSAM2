@@ -15,18 +15,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-import os
-import sys
 import torch
-
-from sam2.build_sam import build_sam2_video_predictor
 
 if __package__ is None:  # pragma: no cover - 兼容直接执行
     sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+from sam2.build_sam import build_sam2_video_predictor
 
 from scripts.wheels.attacks import SAM2ForwardHelper
 from scripts.wheels.trainer import EvaluationSummary, UniversalPatchTrainer, load_uap_samples
@@ -37,7 +37,6 @@ CONFIG_PATH = PROJECT_ROOT / "configs" / "sam2_hiera_s.yaml"
 WEIGHT_PATH = PROJECT_ROOT / "weights" / "sam2_hiera_small.pt"
 DATA_ROOT = PROJECT_ROOT / "data" / "DAVIS"
 
-# 确保 SAM2 可以在本地路径下正确寻找配置文件
 os.environ.setdefault("SAM2_CONFIG_DIR", str(CONFIG_PATH.parent))
 
 
