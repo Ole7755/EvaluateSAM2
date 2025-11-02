@@ -72,6 +72,7 @@ class FrameMetrics:
     dice: float
     precision: float
     recall: float
+    predicted_iou: float | None = None
 
 
 @dataclass(slots=True)
@@ -91,18 +92,28 @@ class SequenceReport:
     def dice_mean(self) -> float:
         return float(np.mean([item.dice for item in self.frames])) if self.frames else 0.0
 
+    @property
+    def predicted_iou_mean(self) -> float | None:
+        scores = [item.predicted_iou for item in self.frames if item.predicted_iou is not None]
+        if not scores:
+            return None
+        return float(np.mean(scores))
+
     def to_summary_row(self) -> dict[str, object]:
-        return {
+        summary = {
             "dataset": self.dataset,
             "sequence": self.sequence,
             "frames": len(self.frames),
             "iou_mean": round(self.iou_mean, 4),
             "dice_mean": round(self.dice_mean, 4),
         }
+        if self.predicted_iou_mean is not None:
+            summary["predicted_iou_mean"] = round(self.predicted_iou_mean, 4)
+        return summary
 
     def iter_rows(self) -> Iterable[dict[str, object]]:
         for item in self.frames:
-            yield {
+            row = {
                 "dataset": self.dataset,
                 "sequence": self.sequence,
                 "frame": item.frame_token,
@@ -111,6 +122,9 @@ class SequenceReport:
                 "precision": round(item.precision, 6),
                 "recall": round(item.recall, 6),
             }
+            if item.predicted_iou is not None:
+                row["predicted_iou"] = round(item.predicted_iou, 6)
+            yield row
 
 
 def evaluate_sequence(
@@ -120,17 +134,23 @@ def evaluate_sequence(
     frame_tokens: Sequence[str],
     predictions: Sequence[np.ndarray],
     ground_truth: Sequence[np.ndarray],
+    predicted_scores: Sequence[float] | None = None,
 ) -> SequenceReport:
     if len(predictions) != len(ground_truth):
         raise ValueError("预测与 GT 掩码数量不一致。")
     if len(frame_tokens) != len(predictions):
         raise ValueError("帧 token 数量与掩码数量不一致。")
+    if predicted_scores is not None and len(predicted_scores) != len(predictions):
+        raise ValueError("预测分数数量与掩码数量不一致。")
 
     report = SequenceReport(dataset=dataset, sequence=sequence)
-    for token, pred, gt in zip(frame_tokens, predictions, ground_truth):
+    for idx, (token, pred, gt) in enumerate(zip(frame_tokens, predictions, ground_truth)):
         iou = compute_iou(pred, gt)
         dice = compute_dice(pred, gt)
         precision, recall = compute_precision_recall(pred, gt)
+        score = None
+        if predicted_scores is not None:
+            score = float(predicted_scores[idx])
         report.add(
             FrameMetrics(
                 frame_token=token,
@@ -138,6 +158,7 @@ def evaluate_sequence(
                 dice=dice,
                 precision=precision,
                 recall=recall,
+                predicted_iou=score,
             )
         )
     return report
@@ -146,10 +167,10 @@ def evaluate_sequence(
 def write_report_csv(report: SequenceReport, csv_path: Path) -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     with csv_path.open("w", newline="") as fp:
-        writer = csv.DictWriter(
-            fp,
-            fieldnames=["dataset", "sequence", "frame", "iou", "dice", "precision", "recall"],
-        )
+        fieldnames = ["dataset", "sequence", "frame", "iou", "dice", "precision", "recall", "predicted_iou"]
+        writer = csv.DictWriter(fp, fieldnames=fieldnames)
         writer.writeheader()
         for row in report.iter_rows():
+            if "predicted_iou" not in row:
+                row["predicted_iou"] = ""
             writer.writerow(row)

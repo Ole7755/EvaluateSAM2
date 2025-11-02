@@ -1,6 +1,6 @@
 # metrics
 
-逐帧与汇总指标输出目录。`main.py` 默认在此写入 `<dataset>_<sequence>_<tag>.csv`，字段包含 IoU、Dice、Precision、Recall 等关键指标。
+逐帧与汇总指标输出目录。`main.py` 默认在此写入 `<dataset>_<sequence>_<tag>.csv`，字段包含 IoU、Dice、Precision、Recall 以及 SAM2 预测的置信度（`predicted_iou`）。
 
 推荐约定：
 - 若存在多次实验，可在文件名前加入时间戳或超参数缩写，例如 `20250105_expA.csv`。

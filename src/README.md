@@ -5,6 +5,7 @@
 - `data_loader.py`：数据集布局解析与帧检索工具。
 - `prompt_generator.py`：从 GT 掩码生成 SAM2 prompt 组合。
 - `model_inference.py`：构建远程推理命令，封装环境变量与路径映射。
+- `model_loader.py`：加载 SAM2 图像预测器，支持直接在评估脚本中调用。
 - `evaluator.py`：指标计算与结果汇总。
 - `visualizer.py`：生成叠加可视化图。
 

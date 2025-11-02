@@ -12,8 +12,6 @@ project/
 │   ├── davis/
 │   ├── mose/
 │   └── vos/
-├── models/
-│   └── sam2_weights/       # 权重占位说明
 ├── src/                    # 评估核心模块
 ├── results/
 │   ├── visualizations/     # 可视化输出
@@ -30,7 +28,8 @@ project/
    ```
 2. **挂载数据与权重**
    - 在 `data/` 下为 `davis/`、`mose/`、`vos/` 创建软链接，指向远程 Linux 上的实际数据（或直接在运行时使用 `--images-dir` / `--gt-dir` 指定路径）。
-   - 在远程环境中准备 SAM2 权重，保持与 `models/sam2_weights/` 约定的命名一致。
+   - SAM2 权重统一放在 `sam2/checkpoints/`，运行脚本时通过 `--sam2-config` 与 `--checkpoint` 指定对应文件。
+   - 若尚未安装 SAM2 Python 包，请执行 `pip install -e sam2`（需在仓库根目录下运行）。
 3. **准备评估标签（可选）**  
    评估时可通过 `--tag`（或其他自定义标识）记录实验信息，便于结果对比。
 
@@ -44,16 +43,25 @@ python3 main.py \
   --sequence bear \
   --resolution 480p \
   --tag exp1 \
-  --pred-dir /path/to/predictions \
-  --images-dir /path/to/images \
-  --gt-dir /path/to/gt_masks \
+  --images-dir data/davis/DAVIS/JPEGImages/480p/bear \
+  --gt-dir data/davis/DAVIS/Annotations_unsupervised/480p/bear \
+  --sam2-config configs/sam2_hiera_s.yaml \
+  --checkpoint sam2/checkpoints/sam2_hiera_small.pt \
   --summary-json results/metrics/bear_exp1_summary.json \
-  --visualize-count 10
+  --visualize-count 10 \
+  --save-pred-masks \
+  --device cuda:0
 ```
+
+- 默认使用 GT 掩码生成点+框提示（`--prompt-type point_box`），可通过 `--prompt-type` 切换为 `point` 或 `box`。
+- `--background-points` 用于在点提示模式下随机采样背景点数量；`--seed` 控制采样复现。
+- 若需启用 SAM2 的多掩码输出以选择评分最高的一张，可添加 `--multimask-output`。
+- `--mask-threshold` 控制预测掩码二值化阈值（默认 0.5）。
 
 - 结果 CSV 默认位于 `results/metrics/<dataset>_<sequence>_<tag>.csv`。
 - 可视化输出位于 `results/visualizations/<dataset>/<sequence>/<tag>/`。
-- 若 `--pred-dir` / `--gt-dir` 省略，则基于数据/结果目录的约定自动推断。
+- 若未提供 `--images-dir` 或 `--gt-dir`，脚本会尝试根据 `data/<dataset>/` 的默认布局推断路径；当目录结构不同步时请显式传参。
+- 加上 `--save-pred-masks` 可将预测掩码写入 `results/comparisons/<dataset>/<sequence>/<tag>/`。
 - `--images-dir` 与 `--gt-dir` 建议直接指向具体序列的帧/掩码目录，例如 `data/davis/DAVIS/JPEGImages/480p/bear`。 
 
 ## 远程推理与命令生成
@@ -68,12 +76,12 @@ from src.model_inference import SAM2InferenceConfig, SAM2InferenceRunner
 spec = SequenceSpec(dataset="davis", sequence="bear", resolution="480p")
 paths = resolve_sequence_paths(spec)
 cfg = SAM2InferenceConfig(
-    checkpoint=Path("models/sam2_weights/sam2_hiera_small.pt"),
+    checkpoint=Path("sam2/checkpoints/sam2_hiera_small.pt"),
     config=Path("configs/sam2_hiera_s.yaml"),
     remote_workspace=Path("/remote/workspaces/AttackSAM2"),
 )
 runner = SAM2InferenceRunner(cfg)
-command = runner.describe("main.py", paths, output_dir=Path("results/visualizations"))
+command = runner.describe("main.py", paths, output_dir=Path("results/comparisons/bear/exp1"))
 print(command)
 ```
 

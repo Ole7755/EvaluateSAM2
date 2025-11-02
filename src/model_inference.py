@@ -85,6 +85,8 @@ class SAM2InferenceRunner:
     ) -> RemoteCommand:
         """
         生成远程执行命令。默认假设 entry_script 位于同步后的工作区中。
+
+        参数 `output_dir` 用于存放预测掩码（通过 `--pred-output-dir` + `--save-pred-masks` 传入）。
         """
         entry = Path(entry_script)
         entry_remote = self.config.to_remote_path(entry)
@@ -101,18 +103,17 @@ class SAM2InferenceRunner:
             sequence.sequence,
             "--images-dir",
             images_remote,
-            "--checkpoint",
-            self.config.to_remote_path(self.config.checkpoint),
             "--sam2-config",
             self.config.to_remote_path(self.config.config),
-            "--output-dir",
-            output_remote,
+            "--checkpoint",
+            self.config.to_remote_path(self.config.checkpoint),
             "--device",
             self.config.device,
         ]
 
         if gt_remote is not None:
             argv.extend(["--gt-dir", gt_remote])
+        argv.extend(["--pred-output-dir", output_remote, "--save-pred-masks"])
         if tag:
             argv.extend(["--tag", tag])
         argv.extend(additional_args)
