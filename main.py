@@ -133,13 +133,7 @@ def _save_pred_mask(mask: np.ndarray, output_dir: Path, token: str) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     mask_img = Image.fromarray((mask.astype(np.uint8) * 255), mode="L")
     mask_img.save(output_dir / f"{token}.png")
-*** End Patch
-    value = value.strip()
-    candidate = Path(value)
-    if candidate.exists():
-        return [line.strip() for line in candidate.read_text().splitlines() if line.strip()]
-    return [token.strip() for token in value.split(",") if token.strip()]
-
+    
 
 def _load_mask(path: Path, threshold: int) -> np.ndarray:
     array = np.array(Image.open(path).convert("L"))
