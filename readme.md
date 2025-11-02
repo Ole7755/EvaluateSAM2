@@ -29,7 +29,7 @@ project/
    pip install -r requirements.txt
    ```
 2. **挂载数据与权重**
-   - 在 `data/` 下为 `davis/`、`mose/`、`vos/` 创建软链接，指向远程 Linux 上的实际数据。
+   - 在 `data/` 下为 `davis/`、`mose/`、`vos/` 创建软链接，指向远程 Linux 上的实际数据（或直接在运行时使用 `--images-dir` / `--gt-dir` 指定路径）。
    - 在远程环境中准备 SAM2 权重，保持与 `models/sam2_weights/` 约定的命名一致。
 3. **准备评估标签（可选）**  
    评估时可通过 `--tag`（或其他自定义标识）记录实验信息，便于结果对比。
@@ -45,14 +45,16 @@ python3 main.py \
   --resolution 480p \
   --tag exp1 \
   --pred-dir /path/to/predictions \
+  --images-dir /path/to/images \
   --gt-dir /path/to/gt_masks \
-  --summary-json results/metrics/bear_pgd_summary.json \
+  --summary-json results/metrics/bear_exp1_summary.json \
   --visualize-count 10
 ```
 
 - 结果 CSV 默认位于 `results/metrics/<dataset>_<sequence>_<tag>.csv`。
 - 可视化输出位于 `results/visualizations/<dataset>/<sequence>/<tag>/`。
 - 若 `--pred-dir` / `--gt-dir` 省略，则基于数据/结果目录的约定自动推断。
+- `--images-dir` 与 `--gt-dir` 建议直接指向具体序列的帧/掩码目录，例如 `data/davis/DAVIS/JPEGImages/480p/bear`。 
 
 ## 远程推理与命令生成
 

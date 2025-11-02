@@ -35,7 +35,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--split", help="适用于 YouTube-VOS 等含 split 的数据集。")
     parser.add_argument("--data-root", type=Path, default=Path("data"), help="数据集根目录。")
     parser.add_argument("--pred-dir", type=Path, help="预测掩码目录，缺省时基于 results/comparisons 推断。")
-    parser.add_argument("--gt-dir", type=Path, help="GT 掩码目录，缺省时从数据集布局推断。")
+    parser.add_argument("--images-dir", type=Path, help="原始图像目录，可显式指定。")
+    parser.add_argument("--gt-dir", type=Path, help="GT 掩码目录，可显式指定。")
     parser.add_argument("--frame-tokens", help="逗号分隔或文本文件路径，指定参与评估的帧。")
     parser.add_argument("--tag", help="可选的实验标签，用于结果命名。")
     parser.add_argument("--results-root", type=Path, default=Path("results"), help="评估结果输出根目录。")
@@ -86,12 +87,37 @@ def main() -> None:
         resolution=args.resolution,
         split=args.split,
     )
-    sequence_paths = resolve_sequence_paths(spec, data_root=args.data_root, create=True)
 
-    pred_dir = args.pred_dir or _default_pred_dir(args.results_root, spec.dataset, spec.sequence, args.tag)
-    gt_dir = args.gt_dir or sequence_paths.mask_dir
+    sequence_paths = None
+    if args.images_dir is None or args.gt_dir is None:
+        try:
+            sequence_paths = resolve_sequence_paths(spec, data_root=args.data_root, create=False)
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(
+                "无法根据默认布局推断图像或 GT 掩码目录，请同时使用 --images-dir 与 --gt-dir 指定。"
+            ) from exc
+
+    pred_dir = (args.pred_dir or _default_pred_dir(args.results_root, spec.dataset, spec.sequence, args.tag)).resolve()
+    if not pred_dir.exists():
+        raise FileNotFoundError(f"预测掩码目录不存在：{pred_dir}")
+
+    if args.images_dir is not None:
+        images_dir = args.images_dir.resolve()
+    else:
+        images_dir = sequence_paths.rgb_dir if sequence_paths else None
+    if images_dir is None:
+        raise RuntimeError("无法推断原始图像目录，请通过 --images-dir 指定。")
+    if not images_dir.exists():
+        raise FileNotFoundError(f"原始图像目录不存在：{images_dir}")
+
+    if args.gt_dir is not None:
+        gt_dir = args.gt_dir.resolve()
+    else:
+        gt_dir = sequence_paths.mask_dir if sequence_paths else None
     if gt_dir is None:
         raise RuntimeError("无法推断 GT 掩码目录，请通过 --gt-dir 指定。")
+    if not gt_dir.exists():
+        raise FileNotFoundError(f"GT 掩码目录不存在：{gt_dir}")
 
     frame_tokens = _load_frame_tokens(args.frame_tokens, pred_dir)
     if not frame_tokens:
@@ -130,7 +156,7 @@ def main() -> None:
         limit = args.visualize_count if args.visualize_count > 0 else len(frame_tokens)
         for token, pred_mask, gt_mask in zip(frame_tokens[:limit], predictions[:limit], ground_truth[:limit]):
             try:
-                frame_path = find_frame_path(sequence_paths.rgb_dir, token)
+                frame_path = find_frame_path(images_dir, token)
             except FileNotFoundError:
                 # 本地可能尚未同步原始帧，跳过可视化
                 continue

@@ -88,8 +88,8 @@ class SAM2InferenceRunner:
         """
         entry = Path(entry_script)
         entry_remote = self.config.to_remote_path(entry)
-        rgb_remote = self.config.to_remote_path(sequence.rgb_dir)
-        mask_remote = self.config.to_remote_path(sequence.mask_dir) if sequence.mask_dir else None
+        images_remote = self.config.to_remote_path(sequence.rgb_dir)
+        gt_remote = self.config.to_remote_path(sequence.mask_dir) if sequence.mask_dir else None
         output_remote = self.config.to_remote_path(output_dir)
 
         argv: list[str] = [
@@ -99,8 +99,8 @@ class SAM2InferenceRunner:
             sequence.dataset,
             "--sequence",
             sequence.sequence,
-            "--rgb-dir",
-            rgb_remote,
+            "--images-dir",
+            images_remote,
             "--checkpoint",
             self.config.to_remote_path(self.config.checkpoint),
             "--sam2-config",
@@ -111,8 +111,8 @@ class SAM2InferenceRunner:
             self.config.device,
         ]
 
-        if mask_remote is not None:
-            argv.extend(["--gt-mask-dir", mask_remote])
+        if gt_remote is not None:
+            argv.extend(["--gt-dir", gt_remote])
         if tag:
             argv.extend(["--tag", tag])
         argv.extend(additional_args)

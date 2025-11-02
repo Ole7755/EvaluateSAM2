@@ -22,4 +22,5 @@ data/
 - 所有帧或图像文件命名须在 `annotations/` 与 `images/` 之间保持一致，确保可一一匹配。
 - 连续帧（视频序列）按子目录存放；单张图像可直接置于 `images/` 根目录。
 - 若需要扩展额外层级（如 train/val split），请保持 `annotations/` 与 `images/` 的相对结构一致，并在 `SequenceSpec` 中通过 `rgb_layout` / `mask_layout` 自定义。
+- 若目录结构与默认模板不同，可在运行时通过 `--images-dir` 与 `--gt-dir` 显式指定路径。
 - 本地 macOS 可通过软链接指向远程 Linux 的实际存储路径，保持一致的目录树。 
