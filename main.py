@@ -136,11 +136,14 @@ def _save_pred_mask(mask: np.ndarray, output_dir: Path, token: str) -> None:
     
 
 def _load_mask(path: Path, threshold: int) -> np.ndarray:
-    array = np.array(Image.open(path).convert("L"))
+    image = Image.open(path)
+    array = np.array(image)
+    if array.ndim == 3:
+        array = array[..., 0]
     if array.max() <= 1:
         mask = array > 0
     else:
-        mask = array >= threshold
+        mask = array > 0 if array.max() <= threshold else array >= threshold
     return mask.astype(np.uint8)
 
 
