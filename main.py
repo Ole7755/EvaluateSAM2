@@ -18,7 +18,7 @@ from typing import Optional
 import numpy as np
 from PIL import Image
 
-from src.data_loader import SequenceSpec, find_frame_path, list_frame_tokens, list_sequences_for_spec, resolve_sequence_paths
+from src.data_loader import SequenceSpec, find_frame_path, list_frame_tokens
 from src.evaluator import evaluate_sequence, write_report_csv
 from src.model_loader import load_image_predictor
 from src.prompt_generator import build_prompt_bundle
@@ -47,8 +47,18 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--resolution", default="480p", help="序列分辨率（用于 DAVIS 等数据集）。")
     parser.add_argument("--split", help="适用于 YouTube-VOS 等含 split 的数据集。")
     parser.add_argument("--data-root", type=Path, default=Path("data"), help="数据集根目录。")
-    parser.add_argument("--images-dir", type=Path, help="原始图像目录，可显式指定。")
-    parser.add_argument("--gt-dir", type=Path, help="GT 掩码目录，可显式指定。")
+    parser.add_argument("--images-dir", type=Path, help="单序列图像目录，需显式指定。")
+    parser.add_argument("--gt-dir", type=Path, help="单序列 GT 掩码目录，需显式指定。")
+    parser.add_argument(
+        "--images-root",
+        type=Path,
+        help="批量评估时的图像根目录，子目录应以序列名命名。",
+    )
+    parser.add_argument(
+        "--gt-root",
+        type=Path,
+        help="批量评估时的 GT 掩码根目录，子目录应以序列名命名。",
+    )
     parser.add_argument("--frame-tokens", help="逗号分隔或文本文件路径，指定参与评估的帧。")
     parser.add_argument("--tag", help="可选的实验标签，用于结果命名。")
     parser.add_argument("--results-root", type=Path, default=Path("results"), help="评估结果输出根目录。")
@@ -242,15 +252,19 @@ def _resolve_sequence_names(args: argparse.Namespace) -> list[str]:
         collected.extend(_load_sequence_list_file(args.sequence_list))
 
     if args.all_sequences:
-        probe_spec = SequenceSpec(
-            dataset=args.dataset,
-            sequence="__SEQUENCE_PLACEHOLDER__",
-            resolution=args.resolution,
-            split=args.split,
-        )
-        auto_sequences = list_sequences_for_spec(probe_spec, data_root=args.data_root)
+        if args.images_root is None or args.gt_root is None:
+            raise RuntimeError("使用 --all-sequences 时必须同时提供 --images-root 与 --gt-root。")
+        images_root = args.images_root.resolve()
+        gt_root = args.gt_root.resolve()
+        if not images_root.exists():
+            raise FileNotFoundError(f"图像根目录不存在：{images_root}")
+        if not gt_root.exists():
+            raise FileNotFoundError(f"GT 根目录不存在：{gt_root}")
+        image_seqs = {entry.name for entry in images_root.iterdir() if entry.is_dir()}
+        gt_seqs = {entry.name for entry in gt_root.iterdir() if entry.is_dir()}
+        auto_sequences = sorted(image_seqs & gt_seqs)
         if not auto_sequences:
-            raise RuntimeError("未在指定数据集中找到任何序列，请确认目录结构或提供 --sequence-list。")
+            raise RuntimeError("未在图像根目录与 GT 根目录的交集中找到任何序列，请确认目录结构。")
         collected.extend(auto_sequences)
 
     sequences = _deduplicate_preserve_order([item for item in collected if item])
@@ -271,31 +285,29 @@ def _evaluate_sequence_with_prompts(
     results_root: Path,
     override_images_dir: Path | None,
     override_gt_dir: Path | None,
+    images_root: Path | None,
+    gt_root: Path | None,
     multiple_sequences: bool,
 ) -> list[dict[str, object]]:
-    sequence_paths = None
-    images_dir = override_images_dir
-    gt_dir = override_gt_dir
-
-    if images_dir is None or gt_dir is None:
-        try:
-            sequence_paths = resolve_sequence_paths(spec, data_root=args.data_root, create=False)
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(
-                f"无法根据默认布局推断序列 {spec.sequence} 的图像或 GT 掩码目录，请提供 --images-dir 与 --gt-dir。"
-            ) from exc
-
-    images_dir = images_dir or (sequence_paths.rgb_dir if sequence_paths else None)
-    if images_dir is None:
-        raise RuntimeError(f"序列 {spec.sequence} 无法确定原始图像目录，请通过 --images-dir 指定。")
-    images_dir = images_dir.resolve()
+    if override_images_dir is not None:
+        images_dir = override_images_dir.resolve()
+    elif images_root is not None:
+        images_dir = (images_root / spec.sequence).resolve()
+    else:
+        raise RuntimeError(
+            f"序列 {spec.sequence} 未提供图像目录，请使用 --images-dir 或 --images-root。"
+        )
     if not images_dir.exists():
         raise FileNotFoundError(f"序列 {spec.sequence} 的原始图像目录不存在：{images_dir}")
 
-    gt_dir = gt_dir or (sequence_paths.mask_dir if sequence_paths else None)
-    if gt_dir is None:
-        raise RuntimeError(f"序列 {spec.sequence} 无法确定 GT 掩码目录，请通过 --gt-dir 指定。")
-    gt_dir = gt_dir.resolve()
+    if override_gt_dir is not None:
+        gt_dir = override_gt_dir.resolve()
+    elif gt_root is not None:
+        gt_dir = (gt_root / spec.sequence).resolve()
+    else:
+        raise RuntimeError(
+            f"序列 {spec.sequence} 未提供 GT 掩码目录，请使用 --gt-dir 或 --gt-root。"
+        )
     if not gt_dir.exists():
         raise FileNotFoundError(f"序列 {spec.sequence} 的 GT 掩码目录不存在：{gt_dir}")
 
@@ -480,7 +492,7 @@ def main() -> None:
     multiple_sequences = len(sequence_names) > 1
 
     if multiple_sequences and (args.images_dir or args.gt_dir):
-        raise RuntimeError("多序列评估暂不支持统一的 --images-dir / --gt-dir 参数，请使用默认目录布局或逐序列运行。")
+        raise RuntimeError("多序列评估不可使用 --images-dir / --gt-dir，请改用 --images-root 与 --gt-root 分别指向数据根目录。")
 
     sam2_config = args.sam2_config.resolve()
     checkpoint = args.checkpoint.resolve()
@@ -503,6 +515,17 @@ def main() -> None:
     summary_json_path = args.summary_json.resolve() if args.summary_json else None
     override_images_dir = args.images_dir.resolve() if args.images_dir else None
     override_gt_dir = args.gt_dir.resolve() if args.gt_dir else None
+    images_root = args.images_root.resolve() if args.images_root else None
+    gt_root = args.gt_root.resolve() if args.gt_root else None
+
+    if multiple_sequences:
+        if images_root is None or gt_root is None:
+            raise RuntimeError("多序列评估时必须通过 --images-root 与 --gt-root 指定目录。")
+    else:
+        if override_images_dir is None and images_root is None:
+            raise RuntimeError("单序列评估需通过 --images-dir 或 --images-root 提供图像目录。")
+        if override_gt_dir is None and gt_root is None:
+            raise RuntimeError("单序列评估需通过 --gt-dir 或 --gt-root 提供 GT 目录。")
 
     all_summaries: list[dict[str, object]] = []
     for sequence_name in sequence_names:
@@ -523,6 +546,8 @@ def main() -> None:
             results_root=results_root,
             override_images_dir=override_images_dir,
             override_gt_dir=override_gt_dir,
+            images_root=images_root,
+            gt_root=gt_root,
             multiple_sequences=multiple_sequences,
         )
         all_summaries.extend(seq_summaries)

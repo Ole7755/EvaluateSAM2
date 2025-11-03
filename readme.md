@@ -27,7 +27,7 @@ project/
    pip install -r requirements.txt
    ```
 2. **挂载数据与权重**
-   - 在 `data/` 下为 `davis/`、`mose/`、`vos/` 创建软链接，指向远程 Linux 上的实际数据（或直接在运行时使用 `--images-dir` / `--gt-dir` 指定路径）。
+   - 准备待评估数据集的图像目录与 GT 目录，可放置在任意位置；运行脚本时需显式通过 `--images-dir` / `--gt-dir`（单序列）或 `--images-root` / `--gt-root`（批量）传入。
    - SAM2 权重统一放在 `sam2/checkpoints/`，运行脚本时通过 `--sam2-config` 与 `--checkpoint` 指定对应文件。
    - 若尚未安装 SAM2 Python 包，请执行 `pip install -e sam2`（需在仓库根目录下运行）。
 3. **准备评估标签（可选）**  
@@ -57,11 +57,11 @@ python3 main.py \
 - `--background-points` 用于在点提示模式下随机采样背景点数量；`--seed` 控制采样复现。
 - 若需启用 SAM2 的多掩码输出以选择评分最高的一张，可添加 `--multimask-output`。
 - `--mask-threshold` 控制预测掩码二值化阈值（默认 0.5）。
-- 若需一次评估多个序列，可使用 `--sequences seq1 seq2`、`--sequence-list list.txt` 或 `--all-sequences`。批量模式下会为每个序列生成独立的指标、可视化与掩码文件夹（不支持同时指定 `--images-dir` / `--gt-dir`）。
+- 若需一次评估多个序列，可使用 `--sequences seq1 seq2`、`--sequence-list list.txt` 或 `--all-sequences`，并必须配合 `--images-root` 与 `--gt-root` 指向包含各序列子目录的根路径；脚本会为每个序列生成独立的指标、可视化与掩码文件夹。
 
 - 结果 CSV 默认位于 `results/metrics/<dataset>_<sequence>_<tag>.csv`。
 - 可视化输出位于 `results/visualizations/<dataset>/<sequence>/<tag>/`。
-- 若未提供 `--images-dir` 或 `--gt-dir`，脚本会尝试根据 `data/<dataset>/` 的默认布局推断路径；当目录结构不同步时请显式传参。
+- 运行评估时需显式提供数据路径：单序列使用 `--images-dir` 与 `--gt-dir`，或指定 `--images-root` / `--gt-root` 后由脚本自动拼接序列子目录；批量模式仅支持根目录传参。
 - 加上 `--save-pred-masks` 可将预测掩码写入 `results/comparisons/<dataset>/<sequence>/<tag>/`。
 - `--images-dir` 与 `--gt-dir` 建议直接指向具体序列的帧/掩码目录，例如 `data/davis/DAVIS/JPEGImages/480p/bear`。 
 
