@@ -97,8 +97,6 @@ class SAM2InferenceRunner:
         argv: list[str] = [
             self.config.python_bin,
             entry_remote,
-            "--dataset",
-            sequence.dataset,
             "--sequence",
             sequence.sequence,
             "--images-dir",
@@ -110,6 +108,9 @@ class SAM2InferenceRunner:
             "--device",
             self.config.device,
         ]
+
+        if sequence.dataset:
+            argv.extend(["--dataset-label", sequence.dataset])
 
         if gt_remote is not None:
             argv.extend(["--gt-dir", gt_remote])

@@ -60,8 +60,8 @@ class SequenceSpec:
     描述一次评估所需的序列信息。
     """
 
-    dataset: str
     sequence: str
+    dataset: str = "default"
     resolution: str | None = "480p"
     split: str | None = None
     rgb_layout: str | None = None
@@ -90,11 +90,11 @@ class SequencePaths:
 
 
 def _normalize_dataset_name(dataset: str) -> str:
-    lowered = dataset.strip()
+    value = dataset.strip()
     for canonical, aliases in DATASET_ALIASES.items():
-        if lowered == canonical or lowered in aliases:
+        if value == canonical or value in aliases:
             return canonical
-    raise ValueError(f"未知数据集名称：{dataset}")
+    return value
 
 
 def resolve_dataset_root(

@@ -35,35 +35,58 @@ project/
 
 ## 运行评估
 
-`main.py` 会读取预测与 GT 掩码，计算 IoU / Dice 等指标，同时生成可选可视化。
+`main.py` 会读取预测与 GT 掩码，计算 IoU / Dice / Precision / Recall，并按需输出 CSV、JSON 及可视化结果。无论单序列还是批量评估，都需要显式传入图像与 GT 的根目录。
 
+### 数据目录要求
+- **单序列**：`--images-dir` 与 `--gt-dir` 指向同一序列的帧目录与掩码目录，目录内的文件名（不含后缀）需一致。
+- **批量序列**：`--images-root` 与 `--gt-root` 指向包含多个序列子目录的根目录，子目录名称需与序列名一致。批量模式会在根目录下自动拼接各序列路径。
+
+### 单序列示例
 ```bash
 python3 main.py \
-  --dataset davis \
   --sequence bear \
   --resolution 480p \
-  --tag exp1 \
-  --images-dir data/davis/DAVIS/JPEGImages/480p/bear \
-  --gt-dir data/davis/DAVIS/Annotations_unsupervised/480p/bear \
+  --dataset-label davis \
+  --images-dir /mnt/data/davis/JPEGImages/480p/bear \
+  --gt-dir /mnt/data/davis/Annotations/480p/bear \
   --sam2-config configs/sam2.1_hiera_small.yaml \
   --checkpoint sam2/checkpoints/sam2.1_hiera_small.pt \
+  --tag exp1 \
   --summary-json results/metrics/bear_exp1_summary.json \
   --visualize-count 10 \
   --save-pred-masks \
   --device cuda:0
 ```
 
-- 默认使用 GT 掩码生成点+框提示（`--prompt-type point_box`），可通过 `--prompt-type` 切换为 `point` 或 `box`。
-- `--background-points` 用于在点提示模式下随机采样背景点数量；`--seed` 控制采样复现。
-- 若需启用 SAM2 的多掩码输出以选择评分最高的一张，可添加 `--multimask-output`。
-- `--mask-threshold` 控制预测掩码二值化阈值（默认 0.5）。
-- 若需一次评估多个序列，可使用 `--sequences seq1 seq2`、`--sequence-list list.txt` 或 `--all-sequences`，并必须配合 `--images-root` 与 `--gt-root` 指向包含各序列子目录的根路径；脚本会为每个序列生成独立的指标、可视化与掩码文件夹。
+### 批量评估多个序列
+```bash
+python3 main.py \
+  --all-sequences \
+  --resolution 480p \
+  --dataset-label davis \
+  --images-root /mnt/data/davis/JPEGImages/480p \
+  --gt-root /mnt/data/davis/Annotations/480p \
+  --prompt-types point box point_box \
+  --background-points 16 \
+  --sam2-config configs/sam2.1_hiera_small.yaml \
+  --checkpoint sam2/checkpoints/sam2.1_hiera_small.pt \
+  --results-root results \
+  --save-pred-masks \
+  --summary-json results/metrics/davis_full_summary.json
+```
+> 也可以用 `--sequences seq1 seq2` 手动列出序列，或通过 `--sequence-list list.txt` 读取序列清单（文件每行一个序列名）。
 
-- 结果 CSV 默认位于 `results/metrics/<dataset>_<sequence>_<tag>.csv`。
-- 可视化输出位于 `results/visualizations/<dataset>/<sequence>/<tag>/`。
-- 运行评估时需显式提供数据路径：单序列使用 `--images-dir` 与 `--gt-dir`，或指定 `--images-root` / `--gt-root` 后由脚本自动拼接序列子目录；批量模式仅支持根目录传参。
-- 加上 `--save-pred-masks` 可将预测掩码写入 `results/comparisons/<dataset>/<sequence>/<tag>/`。
-- `--images-dir` 与 `--gt-dir` 建议直接指向具体序列的帧/掩码目录，例如 `data/davis/DAVIS/JPEGImages/480p/bear`。 
+### 常用参数速览
+- `--prompt-type` / `--prompt-types`：控制使用点、框或点+框提示；提供 `--prompt-types` 时会依次执行多种提示并输出独立结果。
+- `--dataset-label`：自定义结果目录与汇总中显示的数据集标签，未指定时默认使用 `default`。
+- `--background-points`：点提示时从背景随机采样负点数量；与 `--seed` 配合可复现采样。
+- `--multimask-output`：启用 SAM2 的多掩码输出（默认关闭，会在返回的三个掩码中选取得分最高的一个）。
+- `--mask-threshold`：将概率掩码阈值化为二值图的阈值（默认 0.5）。
+- `--save-pred-masks`：开启后把预测掩码保存到 `results/comparisons/<datasetlabel>/<sequence>/<tag>/<prompt>`。
+- `--visualize-dir` / `--visualize-count`：自定义可视化输出目录以及每个序列生成的叠加图数量。
+- `--report-csv` / `--summary-json`：分别控制指标 CSV 与汇总 JSON 的输出路径；多序列或多提示时脚本会自动附加序列名/提示类型后缀。
+
+所有命令都会在终端打印最终指标汇总，同时将详细数据写入 `results/metrics/`（CSV）与可选的 `summary-json` 文件中，方便后续比对。
 
 ## 远程推理与命令生成
 

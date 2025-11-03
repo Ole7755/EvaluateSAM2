@@ -33,7 +33,8 @@
 - 远程 Linux 需预先配置好 SAM2 环境、权重与数据路径；本地脚本负责生成命令与同步结果。
 - 评估输出（可视化、指标等）统一写入 `results/` 目录。
 - 若新增依赖或配置，需同步更新 `requirements.txt` 与 `configs/`，并在远程环境完成安装。
-- 运行脚本时需显式提供数据目录：单序列使用 `--images-dir` 与 `--gt-dir`，或改用 `--images-root` / `--gt-root` 自动拼接序列子目录，并确保配套的 `--sam2-config` 与 `--checkpoint` 有效。
+- 运行脚本时需显式提供数据目录：单序列使用 `--images-dir` 与 `--gt-dir`，批量模式使用 `--images-root` / `--gt-root`（根目录下按序列名划分子目录），并确保配套的 `--sam2-config` 与 `--checkpoint` 有效。
+- 可通过 `--dataset-label` 自定义结果目录与汇总中的数据集标签，未提供时默认使用 `default`。
 - 编写新功能时优先复用 `src/` 下模块，保持数据加载、指令构建和指标计算的一致性。
 - `main.py` 支持通过 `--sequences` / `--sequence-list` / `--all-sequences` 批量评估多个序列，批量模式需配合 `--images-root` 与 `--gt-root` 指向包含序列子目录的根路径。
 

@@ -27,7 +27,6 @@ from src.visualizer import overlay_mask, save_overlay, stack_overlays
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="评估 SAM2 预测结果。")
-    parser.add_argument("--dataset", required=True, help="数据集名称，如 davis/mose/vos。")
     parser.add_argument("--sequence", help="单个序列名称。")
     parser.add_argument(
         "--sequences",
@@ -47,6 +46,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--resolution", default="480p", help="序列分辨率（用于 DAVIS 等数据集）。")
     parser.add_argument("--split", help="适用于 YouTube-VOS 等含 split 的数据集。")
     parser.add_argument("--data-root", type=Path, default=Path("data"), help="数据集根目录。")
+    parser.add_argument(
+        "--dataset-label",
+        help="用于结果组织的自定义数据集标签，留空则默认为 default。",
+    )
     parser.add_argument("--images-dir", type=Path, help="单序列图像目录，需显式指定。")
     parser.add_argument("--gt-dir", type=Path, help="单序列 GT 掩码目录，需显式指定。")
     parser.add_argument(
@@ -176,13 +179,16 @@ def _load_mask(path: Path, threshold: int) -> np.ndarray:
 
 def _default_pred_dir(
     results_root: Path,
-    dataset: str,
+    dataset_label: str | None,
     sequence: str,
     tag: str | None,
     prompt_type: str | None = None,
 ) -> Path:
     label = tag or "default"
-    path = results_root / "comparisons" / dataset / sequence / label
+    path = results_root / "comparisons"
+    if dataset_label:
+        path = path / dataset_label
+    path = path / sequence / label
     if prompt_type:
         path = path / prompt_type
     return path
@@ -190,13 +196,16 @@ def _default_pred_dir(
 
 def _default_visual_dir(
     results_root: Path,
-    dataset: str,
+    dataset_label: str | None,
     sequence: str,
     tag: str | None,
     prompt_type: str | None = None,
 ) -> Path:
     label = tag or "default"
-    path = results_root / "visualizations" / dataset / sequence / label
+    path = results_root / "visualizations"
+    if dataset_label:
+        path = path / dataset_label
+    path = path / sequence / label
     if prompt_type:
         path = path / prompt_type
     return path
@@ -204,13 +213,15 @@ def _default_visual_dir(
 
 def _default_report_path(
     results_root: Path,
-    dataset: str,
+    dataset_label: str | None,
     sequence: str,
     tag: str | None,
     prompt_type: str | None = None,
 ) -> Path:
     label = tag or "default"
-    stem = f"{dataset}_{sequence}_{label}"
+    stem = f"{sequence}_{label}"
+    if dataset_label:
+        stem = f"{dataset_label}_{stem}"
     if prompt_type:
         stem = f"{stem}_{prompt_type}"
     return results_root / "metrics" / f"{stem}.csv"
@@ -494,6 +505,8 @@ def main() -> None:
     if multiple_sequences and (args.images_dir or args.gt_dir):
         raise RuntimeError("多序列评估不可使用 --images-dir / --gt-dir，请改用 --images-root 与 --gt-root 分别指向数据根目录。")
 
+    dataset_label = args.dataset_label.strip() if (hasattr(args, "dataset_label") and args.dataset_label) else "default"
+
     sam2_config = args.sam2_config.resolve()
     checkpoint = args.checkpoint.resolve()
     if not sam2_config.exists():
@@ -530,8 +543,8 @@ def main() -> None:
     all_summaries: list[dict[str, object]] = []
     for sequence_name in sequence_names:
         spec = SequenceSpec(
-            dataset=args.dataset,
             sequence=sequence_name,
+            dataset=dataset_label,
             resolution=args.resolution,
             split=args.split,
         )
