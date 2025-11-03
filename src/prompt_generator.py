@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
 
 import numpy as np
 
@@ -93,6 +92,7 @@ def _sample_background_points(
 def build_prompt_bundle(
     mask: np.ndarray,
     *,
+    include_points: bool = True,
     include_box: bool = True,
     background_points: int = 0,
     rng: np.random.Generator | None = None,
@@ -102,16 +102,20 @@ def build_prompt_bundle(
     组合点、框和可选的 mask 提示，便于直接输送至 SAM2。
     """
     rng = rng or np.random.default_rng()
-    pos_points = mask_to_point_prompt(mask)
-    point_labels = np.ones(pos_points.shape[0], dtype=np.int32)
+    if include_points:
+        pos_points = mask_to_point_prompt(mask)
+        point_labels = np.ones(pos_points.shape[0], dtype=np.int32)
 
-    neg_points = _sample_background_points(mask, background_points, rng)
-    if neg_points.size > 0:
-        points = np.concatenate([pos_points, neg_points], axis=0)
-        neg_labels = np.zeros(neg_points.shape[0], dtype=np.int32)
-        point_labels = np.concatenate([point_labels, neg_labels], axis=0)
+        neg_points = _sample_background_points(mask, background_points, rng)
+        if neg_points.size > 0:
+            points = np.concatenate([pos_points, neg_points], axis=0)
+            neg_labels = np.zeros(neg_points.shape[0], dtype=np.int32)
+            point_labels = np.concatenate([point_labels, neg_labels], axis=0)
+        else:
+            points = pos_points
     else:
-        points = pos_points
+        points = np.empty((0, 2), dtype=np.float32)
+        point_labels = np.empty((0,), dtype=np.int32)
 
     boxes = mask_to_box_prompt(mask) if include_box else None
     return PromptBundle(points=points, point_labels=point_labels, boxes=boxes, mask_input=mask_input)
