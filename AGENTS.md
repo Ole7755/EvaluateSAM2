@@ -35,6 +35,7 @@
 - 若新增依赖或配置，需同步更新 `requirements.txt` 与 `configs/`，并在远程环境完成安装。
 - 当数据目录布局不符合默认模板时，请在运行脚本时通过 `--images-dir` 与 `--gt-dir` 指定实际路径，并确保提供正确的 `--sam2-config` 与 `--checkpoint`（默认存放于 `sam2/checkpoints/`）。
 - 编写新功能时优先复用 `src/` 下模块，保持数据加载、指令构建和指标计算的一致性。
+- `main.py` 支持通过 `--sequences` / `--sequence-list` / `--all-sequences` 批量评估多个序列，运行多序列时需遵循默认目录布局（不再单独传入 `--images-dir` / `--gt-dir`）。
 
 常见核对项
 ------

@@ -20,6 +20,7 @@ __all__ = [
     "SequencePaths",
     "resolve_dataset_root",
     "resolve_sequence_paths",
+    "list_sequences_for_spec",
     "list_sequences",
     "list_frame_tokens",
     "find_frame_path",
@@ -97,6 +98,16 @@ def _normalize_dataset_name(dataset: str) -> str:
     raise ValueError(f"未知数据集名称：{dataset}")
 
 
+def _resolve_layout_template(spec: SequenceSpec, kind: str) -> str | None:
+    layout = spec.rgb_layout if kind == "rgb" else spec.mask_layout
+    if layout is not None:
+        template = layout
+    else:
+        canonical = _normalize_dataset_name(spec.dataset)
+        template = DEFAULT_LAYOUT.get(canonical, {}).get(kind)
+    return template
+
+
 def resolve_dataset_root(
     dataset: str,
     data_root: Path | str = Path("data"),
@@ -115,12 +126,7 @@ def resolve_dataset_root(
 
 
 def _format_layout(spec: SequenceSpec, kind: str) -> str | None:
-    layout = spec.rgb_layout if kind == "rgb" else spec.mask_layout
-    if layout is not None:
-        template = layout
-    else:
-        canonical = _normalize_dataset_name(spec.dataset)
-        template = DEFAULT_LAYOUT.get(canonical, {}).get(kind)
+    template = _resolve_layout_template(spec, kind)
     if template is None:
         return None
     resolution = spec.resolution or ""
@@ -173,6 +179,46 @@ def list_sequences(dataset: str, data_root: Path | str = Path("data")) -> list[s
         for entry in dataset_root.iterdir()
         if entry.is_dir()
     )
+
+
+def _layout_base_dir(spec: SequenceSpec, kind: str, data_root: Path) -> Path | None:
+    template = _resolve_layout_template(spec, kind)
+    if template is None:
+        return None
+    resolution = spec.resolution or ""
+    split = spec.split or ""
+    sentinel = "__SEQUENCE_PLACEHOLDER__"
+    formatted = template.format(resolution=resolution, split=split, sequence=sentinel)
+    path = (data_root / formatted).resolve()
+    return path.parent if sentinel in formatted else path
+
+
+def list_sequences_for_spec(
+    spec: SequenceSpec,
+    data_root: Path | str = Path("data"),
+) -> list[str]:
+    """
+    根据 SequenceSpec 描述推断所有序列名称。
+
+    优先从 RGB 与 Mask 路径的交集获取序列列表；若仅存在其一，则直接返回该目录下的子目录名称。
+    """
+    data_root = Path(data_root)
+    rgb_base = _layout_base_dir(spec, "rgb", data_root)
+    mask_base = _layout_base_dir(spec, "mask", data_root)
+
+    candidates: set[str] | None = None
+    for base in (rgb_base, mask_base):
+        if base is None or not base.exists():
+            continue
+        names = {entry.name for entry in base.iterdir() if entry.is_dir()}
+        if not names:
+            continue
+        candidates = names if candidates is None else candidates & names
+
+    if candidates is None:
+        # 如果没有目录可用，返回空列表，交由上层决定是否报错
+        return []
+    return sorted(candidates)
 
 
 def list_frame_tokens(rgb_dir: Path) -> list[str]:

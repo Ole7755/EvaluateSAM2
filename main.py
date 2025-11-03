@@ -18,12 +18,7 @@ from typing import Optional
 import numpy as np
 from PIL import Image
 
-from src.data_loader import (
-    SequenceSpec,
-    find_frame_path,
-    list_frame_tokens,
-    resolve_sequence_paths,
-)
+from src.data_loader import SequenceSpec, find_frame_path, list_frame_tokens, list_sequences_for_spec, resolve_sequence_paths
 from src.evaluator import evaluate_sequence, write_report_csv
 from src.model_loader import load_image_predictor
 from src.prompt_generator import build_prompt_bundle
@@ -33,7 +28,22 @@ from src.visualizer import overlay_mask, save_overlay, stack_overlays
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="评估 SAM2 预测结果。")
     parser.add_argument("--dataset", required=True, help="数据集名称，如 davis/mose/vos。")
-    parser.add_argument("--sequence", required=True, help="序列名称。")
+    parser.add_argument("--sequence", help="单个序列名称。")
+    parser.add_argument(
+        "--sequences",
+        nargs="+",
+        help="一次指定多个序列名称（用空格分隔）。",
+    )
+    parser.add_argument(
+        "--sequence-list",
+        type=Path,
+        help="包含序列名称的文本文件，每行一个序列。",
+    )
+    parser.add_argument(
+        "--all-sequences",
+        action="store_true",
+        help="自动遍历数据集下可用的全部序列。",
+    )
     parser.add_argument("--resolution", default="480p", help="序列分辨率（用于 DAVIS 等数据集）。")
     parser.add_argument("--split", help="适用于 YouTube-VOS 等含 split 的数据集。")
     parser.add_argument("--data-root", type=Path, default=Path("data"), help="数据集根目录。")
@@ -196,55 +206,98 @@ def _default_report_path(
     return results_root / "metrics" / f"{stem}.csv"
 
 
-def main() -> None:
-    args = _parse_args()
+def _load_sequence_list_file(path: Path) -> list[str]:
+    if not path.exists():
+        raise FileNotFoundError(f"序列列表文件不存在：{path}")
+    return [line.strip() for line in path.read_text().splitlines() if line.strip()]
 
-    spec = SequenceSpec(
-        dataset=args.dataset,
-        sequence=args.sequence,
-        resolution=args.resolution,
-        split=args.split,
-    )
 
+def _deduplicate_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in values:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+
+def _resolve_sequence_names(args: argparse.Namespace) -> list[str]:
+    collected: list[str] = []
+
+    if args.sequence:
+        for token in args.sequence.split(","):
+            token = token.strip()
+            if token:
+                collected.append(token)
+
+    if args.sequences:
+        for item in args.sequences:
+            for token in item.split(","):
+                token = token.strip()
+                if token:
+                    collected.append(token)
+
+    if args.sequence_list:
+        collected.extend(_load_sequence_list_file(args.sequence_list))
+
+    if args.all_sequences:
+        probe_spec = SequenceSpec(
+            dataset=args.dataset,
+            sequence="__SEQUENCE_PLACEHOLDER__",
+            resolution=args.resolution,
+            split=args.split,
+        )
+        auto_sequences = list_sequences_for_spec(probe_spec, data_root=args.data_root)
+        if not auto_sequences:
+            raise RuntimeError("未在指定数据集中找到任何序列，请确认目录结构或提供 --sequence-list。")
+        collected.extend(auto_sequences)
+
+    sequences = _deduplicate_preserve_order([item for item in collected if item])
+    if not sequences:
+        raise RuntimeError("请至少通过 --sequence / --sequences / --sequence-list / --all-sequences 提供一个序列。")
+    return sequences
+
+
+def _evaluate_sequence_with_prompts(
+    *,
+    spec: SequenceSpec,
+    args: argparse.Namespace,
+    predictor,
+    prompt_types: list[str],
+    multi_prompt: bool,
+    sam2_config: Path,
+    checkpoint: Path,
+    results_root: Path,
+    override_images_dir: Path | None,
+    override_gt_dir: Path | None,
+    multiple_sequences: bool,
+) -> list[dict[str, object]]:
     sequence_paths = None
-    if args.images_dir is None or args.gt_dir is None:
+    images_dir = override_images_dir
+    gt_dir = override_gt_dir
+
+    if images_dir is None or gt_dir is None:
         try:
             sequence_paths = resolve_sequence_paths(spec, data_root=args.data_root, create=False)
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError(
-                "无法根据默认布局推断图像或 GT 掩码目录，请同时使用 --images-dir 与 --gt-dir 指定。"
+                f"无法根据默认布局推断序列 {spec.sequence} 的图像或 GT 掩码目录，请提供 --images-dir 与 --gt-dir。"
             ) from exc
 
-    images_dir = args.images_dir.resolve() if args.images_dir else (sequence_paths.rgb_dir if sequence_paths else None)
+    images_dir = images_dir or (sequence_paths.rgb_dir if sequence_paths else None)
     if images_dir is None:
-        raise RuntimeError("无法推断原始图像目录，请通过 --images-dir 指定。")
+        raise RuntimeError(f"序列 {spec.sequence} 无法确定原始图像目录，请通过 --images-dir 指定。")
+    images_dir = images_dir.resolve()
     if not images_dir.exists():
-        raise FileNotFoundError(f"原始图像目录不存在：{images_dir}")
+        raise FileNotFoundError(f"序列 {spec.sequence} 的原始图像目录不存在：{images_dir}")
 
-    gt_dir = args.gt_dir.resolve() if args.gt_dir else (sequence_paths.mask_dir if sequence_paths else None)
+    gt_dir = gt_dir or (sequence_paths.mask_dir if sequence_paths else None)
     if gt_dir is None:
-        raise RuntimeError("无法推断 GT 掩码目录，请通过 --gt-dir 指定。")
+        raise RuntimeError(f"序列 {spec.sequence} 无法确定 GT 掩码目录，请通过 --gt-dir 指定。")
+    gt_dir = gt_dir.resolve()
     if not gt_dir.exists():
-        raise FileNotFoundError(f"GT 掩码目录不存在：{gt_dir}")
-
-    sam2_config = args.sam2_config.resolve()
-    checkpoint = args.checkpoint.resolve()
-    if not sam2_config.exists():
-        raise FileNotFoundError(f"SAM2 配置文件不存在：{sam2_config}")
-    if not checkpoint.exists():
-        raise FileNotFoundError(f"SAM2 权重文件不存在：{checkpoint}")
-
-    predictor = load_image_predictor(
-        config_path=sam2_config,
-        checkpoint_path=checkpoint,
-        device=args.device,
-        mask_threshold=args.mask_threshold,
-    )
-
-    prompt_types = args.prompt_types or [args.prompt_type]
-    # 去重但保持用户输入顺序
-    prompt_types = list(dict.fromkeys(prompt_types))
-    multi_prompt = len(prompt_types) > 1
+        raise FileNotFoundError(f"序列 {spec.sequence} 的 GT 掩码目录不存在：{gt_dir}")
 
     frame_tokens = _load_frame_tokens(args.frame_tokens, images_dir, gt_dir)
 
@@ -258,7 +311,6 @@ def main() -> None:
         frames_data.append(
             {
                 "token": token,
-                "image_path": image_path,
                 "image_np": image_np,
                 "gt_mask": gt_mask,
             }
@@ -277,7 +329,6 @@ def main() -> None:
         }
 
     summaries: list[dict[str, object]] = []
-    summary_json_path = args.summary_json.resolve() if args.summary_json else None
 
     for prompt_type in prompt_types:
         rng = rng_map[prompt_type]
@@ -288,10 +339,12 @@ def main() -> None:
         if args.save_pred_masks:
             if args.pred_output_dir:
                 base_dir = args.pred_output_dir.resolve()
+                if multiple_sequences:
+                    base_dir = base_dir / spec.sequence
                 pred_output_dir = base_dir / prompt_type if multi_prompt else base_dir
             else:
                 pred_output_dir = _default_pred_dir(
-                    args.results_root,
+                    results_root,
                     spec.dataset,
                     spec.sequence,
                     args.tag,
@@ -304,7 +357,7 @@ def main() -> None:
             image_np = data["image_np"]
             gt_mask = data["gt_mask"]
 
-            predictor.set_image(image_np)  # 每种 prompt 重复使用相同帧
+            predictor.set_image(image_np)
 
             try:
                 points, labels, box = _prepare_prompts(
@@ -313,8 +366,8 @@ def main() -> None:
                     background_points=args.background_points,
                     rng=rng,
                 )
-            except ValueError as exc:  # 空掩码等情况
-                print(f"[WARN] 帧 {token}（{prompt_type}）无法生成提示：{exc}，将使用空预测掩码。")
+            except ValueError as exc:
+                print(f"[WARN] 序列 {spec.sequence} 帧 {token}（{prompt_type}）无法生成提示：{exc}，使用空预测掩码。")
                 empty_mask = np.zeros_like(gt_mask, dtype=np.uint8)
                 predictions.append(empty_mask)
                 predicted_scores.append(0.0)
@@ -349,14 +402,15 @@ def main() -> None:
 
         if args.report_csv:
             base_csv = args.report_csv.resolve()
-            report_csv = (
-                base_csv.with_name(f"{base_csv.stem}_{prompt_type}{base_csv.suffix}")
-                if multi_prompt
-                else base_csv
-            )
+            stem = base_csv.stem
+            if multiple_sequences:
+                stem = f"{stem}_{spec.sequence}"
+            if multi_prompt:
+                stem = f"{stem}_{prompt_type}"
+            report_csv = base_csv.with_name(f"{stem}{base_csv.suffix}")
         else:
             report_csv = _default_report_path(
-                args.results_root,
+                results_root,
                 spec.dataset,
                 spec.sequence,
                 args.tag,
@@ -383,10 +437,12 @@ def main() -> None:
 
         if args.visualize_dir:
             base_visual_dir = args.visualize_dir.resolve()
+            if multiple_sequences:
+                base_visual_dir = base_visual_dir / spec.sequence
             visualize_dir = base_visual_dir / prompt_type if multi_prompt else base_visual_dir
         else:
             visualize_dir = _default_visual_dir(
-                args.results_root,
+                results_root,
                 spec.dataset,
                 spec.sequence,
                 args.tag,
@@ -404,7 +460,6 @@ def main() -> None:
                 try:
                     frame_path = find_frame_path(images_dir, token)
                 except FileNotFoundError:
-                    # 本地可能尚未同步原始帧，跳过可视化
                     continue
                 frame = Image.open(frame_path).convert("RGB")
                 pred_overlay = overlay_mask(frame, pred_mask, color=(0, 255, 0), alpha=0.4)
@@ -415,11 +470,68 @@ def main() -> None:
 
         summaries.append(summary)
 
+    return summaries
+
+
+def main() -> None:
+    args = _parse_args()
+
+    sequence_names = _resolve_sequence_names(args)
+    multiple_sequences = len(sequence_names) > 1
+
+    if multiple_sequences and (args.images_dir or args.gt_dir):
+        raise RuntimeError("多序列评估暂不支持统一的 --images-dir / --gt-dir 参数，请使用默认目录布局或逐序列运行。")
+
+    sam2_config = args.sam2_config.resolve()
+    checkpoint = args.checkpoint.resolve()
+    if not sam2_config.exists():
+        raise FileNotFoundError(f"SAM2 配置文件不存在：{sam2_config}")
+    if not checkpoint.exists():
+        raise FileNotFoundError(f"SAM2 权重文件不存在：{checkpoint}")
+
+    predictor = load_image_predictor(
+        config_path=sam2_config,
+        checkpoint_path=checkpoint,
+        device=args.device,
+        mask_threshold=args.mask_threshold,
+    )
+
+    prompt_types = list(dict.fromkeys(args.prompt_types or [args.prompt_type]))
+    multi_prompt = len(prompt_types) > 1
+
+    results_root = args.results_root.resolve()
+    summary_json_path = args.summary_json.resolve() if args.summary_json else None
+    override_images_dir = args.images_dir.resolve() if args.images_dir else None
+    override_gt_dir = args.gt_dir.resolve() if args.gt_dir else None
+
+    all_summaries: list[dict[str, object]] = []
+    for sequence_name in sequence_names:
+        spec = SequenceSpec(
+            dataset=args.dataset,
+            sequence=sequence_name,
+            resolution=args.resolution,
+            split=args.split,
+        )
+        seq_summaries = _evaluate_sequence_with_prompts(
+            spec=spec,
+            args=args,
+            predictor=predictor,
+            prompt_types=prompt_types,
+            multi_prompt=multi_prompt,
+            sam2_config=sam2_config,
+            checkpoint=checkpoint,
+            results_root=results_root,
+            override_images_dir=override_images_dir,
+            override_gt_dir=override_gt_dir,
+            multiple_sequences=multiple_sequences,
+        )
+        all_summaries.extend(seq_summaries)
+
     summary_payload: list[dict[str, object]] | dict[str, object]
-    if multi_prompt:
-        summary_payload = summaries
+    if len(all_summaries) == 1:
+        summary_payload = all_summaries[0]
     else:
-        summary_payload = summaries[0]
+        summary_payload = all_summaries
 
     if summary_json_path is not None:
         summary_json_path.parent.mkdir(parents=True, exist_ok=True)

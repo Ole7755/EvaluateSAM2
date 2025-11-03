@@ -57,6 +57,7 @@ python3 main.py \
 - `--background-points` 用于在点提示模式下随机采样背景点数量；`--seed` 控制采样复现。
 - 若需启用 SAM2 的多掩码输出以选择评分最高的一张，可添加 `--multimask-output`。
 - `--mask-threshold` 控制预测掩码二值化阈值（默认 0.5）。
+- 若需一次评估多个序列，可使用 `--sequences seq1 seq2`、`--sequence-list list.txt` 或 `--all-sequences`。批量模式下会为每个序列生成独立的指标、可视化与掩码文件夹（不支持同时指定 `--images-dir` / `--gt-dir`）。
 
 - 结果 CSV 默认位于 `results/metrics/<dataset>_<sequence>_<tag>.csv`。
 - 可视化输出位于 `results/visualizations/<dataset>/<sequence>/<tag>/`。
