@@ -45,8 +45,8 @@ python3 main.py \
   --tag exp1 \
   --images-dir data/davis/DAVIS/JPEGImages/480p/bear \
   --gt-dir data/davis/DAVIS/Annotations_unsupervised/480p/bear \
-  --sam2-config configs/sam2_hiera_s.yaml \
-  --checkpoint sam2/checkpoints/sam2_hiera_small.pt \
+  --sam2-config configs/sam2.1_hiera_small.yaml \
+  --checkpoint sam2/checkpoints/sam2.1_hiera_small.pt \
   --summary-json results/metrics/bear_exp1_summary.json \
   --visualize-count 10 \
   --save-pred-masks \
@@ -76,8 +76,8 @@ from src.model_inference import SAM2InferenceConfig, SAM2InferenceRunner
 spec = SequenceSpec(dataset="davis", sequence="bear", resolution="480p")
 paths = resolve_sequence_paths(spec)
 cfg = SAM2InferenceConfig(
-    checkpoint=Path("sam2/checkpoints/sam2_hiera_small.pt"),
-    config=Path("configs/sam2_hiera_s.yaml"),
+    checkpoint=Path("sam2/checkpoints/sam2.1_hiera_small.pt"),
+    config=Path("configs/sam2.1_hiera_small.yaml"),
     remote_workspace=Path("/remote/workspaces/AttackSAM2"),
 )
 runner = SAM2InferenceRunner(cfg)
