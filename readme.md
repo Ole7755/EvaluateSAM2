@@ -82,6 +82,7 @@ python3 main.py \
 - `--background-points`：点提示时从背景随机采样负点数量；与 `--seed` 配合可复现采样。
 - `--multimask-output`：启用 SAM2 的多掩码输出（默认关闭，会在返回的三个掩码中选取得分最高的一个）。
 - `--mask-threshold`：将概率掩码阈值化为二值图的阈值（默认 0.5）。
+- `--batch-size`：控制每批一起推理的帧数，>1 时会启用批量推理以更好地利用 GPU（需根据显存自行调整）。
 - `--save-pred-masks`：开启后把预测掩码保存到 `results/comparisons/<datasetlabel>/<sequence>/<tag>/<prompt>`。
 - `--visualize-dir` / `--visualize-count`：自定义可视化输出目录以及每个序列生成的叠加图数量。
 - `--report-csv` / `--summary-json`：分别控制指标 CSV 与汇总 JSON 的输出路径；多序列或多提示时脚本会自动附加序列名/提示类型后缀。

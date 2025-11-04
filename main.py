@@ -104,6 +104,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--sam2-config", type=Path, required=True, help="SAM2 配置文件路径。")
     parser.add_argument("--checkpoint", type=Path, required=True, help="SAM2 权重文件路径。")
     parser.add_argument("--device", default="cuda", help="运行设备，例如 cuda 或 cpu。")
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=1,
+        help="每次一起处理的帧数量，用于提升 GPU 利用率（需根据显存设置）。",
+    )
     return parser.parse_args()
 
 
@@ -299,6 +305,7 @@ def _evaluate_sequence_with_prompts(
     images_root: Path | None,
     gt_root: Path | None,
     multiple_sequences: bool,
+    batch_size: int,
 ) -> list[dict[str, object]]:
     if override_images_dir is not None:
         images_dir = override_images_dir.resolve()
@@ -323,6 +330,7 @@ def _evaluate_sequence_with_prompts(
         raise FileNotFoundError(f"序列 {spec.sequence} 的 GT 掩码目录不存在：{gt_dir}")
 
     frame_tokens = _load_frame_tokens(args.frame_tokens, images_dir, gt_dir)
+    batch_size = max(1, batch_size)
 
     frames_data: list[dict[str, object]] = []
     for token in frame_tokens:
@@ -375,44 +383,80 @@ def _evaluate_sequence_with_prompts(
                 ).resolve()
             pred_output_dir.mkdir(parents=True, exist_ok=True)
 
-        for data in frames_data:
-            token = data["token"]
-            image_np = data["image_np"]
-            gt_mask = data["gt_mask"]
+        # Process frames in configurable batches to better leverage GPU throughput.
+        total_frames = len(frames_data)
+        for batch_start in range(0, total_frames, batch_size):
+            batch_frames = frames_data[batch_start : batch_start + batch_size]
+            batch_predictions: list[np.ndarray | None] = [None] * len(batch_frames)
+            batch_scores: list[float] = [0.0] * len(batch_frames)
+            valid_indices: list[int] = []
+            valid_images: list[np.ndarray] = []
+            points_list: list[np.ndarray | None] = []
+            labels_list: list[np.ndarray | None] = []
+            boxes_list: list[np.ndarray | None] = []
 
-            predictor.set_image(image_np)
+            for local_idx, data in enumerate(batch_frames):
+                token = data["token"]
+                gt_mask = data["gt_mask"]
+                try:
+                    points, labels, box = _prepare_prompts(
+                        gt_mask.astype(bool),
+                        prompt_type=prompt_type,
+                        background_points=args.background_points,
+                        rng=rng,
+                    )
+                except ValueError as exc:
+                    print(
+                        f"[WARN] 序列 {spec.sequence} 帧 {token}（{prompt_type}）无法生成提示：{exc}，使用空预测掩码。"
+                    )
+                    batch_predictions[local_idx] = np.zeros_like(gt_mask, dtype=np.uint8)
+                    batch_scores[local_idx] = 0.0
+                    continue
 
-            try:
-                points, labels, box = _prepare_prompts(
-                    gt_mask.astype(bool),
-                    prompt_type=prompt_type,
-                    background_points=args.background_points,
-                    rng=rng,
+                valid_indices.append(local_idx)
+                valid_images.append(data["image_np"])
+                points_list.append(points)
+                labels_list.append(labels)
+                boxes_list.append(box)
+
+            if valid_images:
+                predictor.set_image_batch(valid_images)
+                point_coords_batch = (
+                    points_list if any(item is not None for item in points_list) else None
                 )
-            except ValueError as exc:
-                print(f"[WARN] 序列 {spec.sequence} 帧 {token}（{prompt_type}）无法生成提示：{exc}，使用空预测掩码。")
-                empty_mask = np.zeros_like(gt_mask, dtype=np.uint8)
-                predictions.append(empty_mask)
-                predicted_scores.append(0.0)
+                point_labels_batch = (
+                    labels_list if point_coords_batch is not None else None
+                )
+                box_batch = (
+                    boxes_list if any(item is not None for item in boxes_list) else None
+                )
+
+                masks_batch, iou_batch, _ = predictor.predict_batch(
+                    point_coords_batch=point_coords_batch,
+                    point_labels_batch=point_labels_batch,
+                    box_batch=box_batch,
+                    multimask_output=args.multimask_output,
+                )
+
+                for rel_idx, (mask_candidates, iou_candidates) in enumerate(
+                    zip(masks_batch, iou_batch)
+                ):
+                    best_idx = int(np.argmax(iou_candidates))
+                    selected_mask = mask_candidates[best_idx]
+                    binary_mask = (selected_mask >= args.mask_threshold).astype(np.uint8)
+                    orig_idx = valid_indices[rel_idx]
+                    batch_predictions[orig_idx] = binary_mask
+                    batch_scores[orig_idx] = float(iou_candidates[best_idx])
+
+            for local_idx, data in enumerate(batch_frames):
+                token = data["token"]
+                pred_mask = batch_predictions[local_idx]
+                if pred_mask is None:
+                    pred_mask = np.zeros_like(data["gt_mask"], dtype=np.uint8)
+                predictions.append(pred_mask)
+                predicted_scores.append(float(batch_scores[local_idx]))
                 if pred_output_dir is not None:
-                    _save_pred_mask(empty_mask, pred_output_dir, token)
-                continue
-
-            masks, iou_predictions, _ = predictor.predict(
-                point_coords=points,
-                point_labels=labels,
-                box=box,
-                multimask_output=args.multimask_output,
-            )
-            best_idx = int(np.argmax(iou_predictions))
-            selected_mask = masks[best_idx]
-            binary_mask = (selected_mask >= args.mask_threshold).astype(np.uint8)
-
-            predictions.append(binary_mask)
-            predicted_scores.append(float(iou_predictions[best_idx]))
-
-            if pred_output_dir is not None:
-                _save_pred_mask(binary_mask, pred_output_dir, token)
+                    _save_pred_mask(pred_mask, pred_output_dir, token)
 
         report = evaluate_sequence(
             dataset=spec.dataset,
@@ -506,6 +550,8 @@ def main() -> None:
         raise RuntimeError("多序列评估不可使用 --images-dir / --gt-dir，请改用 --images-root 与 --gt-root 分别指向数据根目录。")
 
     dataset_label = args.dataset_label.strip() if (hasattr(args, "dataset_label") and args.dataset_label) else "default"
+    if args.batch_size <= 0:
+        raise RuntimeError("--batch-size 必须为正整数。")
 
     sam2_config = args.sam2_config.resolve()
     checkpoint = args.checkpoint.resolve()
@@ -562,6 +608,7 @@ def main() -> None:
             images_root=images_root,
             gt_root=gt_root,
             multiple_sequences=multiple_sequences,
+            batch_size=args.batch_size,
         )
         all_summaries.extend(seq_summaries)
 
