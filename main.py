@@ -43,7 +43,6 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="自动遍历数据集下可用的全部序列。",
     )
-    parser.add_argument("--resolution", default="480p", help="序列分辨率（用于 DAVIS 等数据集）。")
     parser.add_argument("--split", help="适用于 YouTube-VOS 等含 split 的数据集。")
     parser.add_argument("--data-root", type=Path, default=Path("data"), help="数据集根目录。")
     parser.add_argument(
@@ -591,7 +590,6 @@ def main() -> None:
         spec = SequenceSpec(
             sequence=sequence_name,
             dataset=dataset_label,
-            resolution=args.resolution,
             split=args.split,
         )
         seq_summaries = _evaluate_sequence_with_prompts(

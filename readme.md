@@ -45,7 +45,6 @@ project/
 ```bash
 python3 main.py \
   --sequence bear \
-  --resolution 480p \
   --dataset-label davis \
   --images-dir /mnt/data/davis/JPEGImages/480p/bear \
   --gt-dir /mnt/data/davis/Annotations/480p/bear \
@@ -62,7 +61,6 @@ python3 main.py \
 ```bash
 python3 main.py \
   --all-sequences \
-  --resolution 480p \
   --dataset-label davis \
   --images-root /mnt/data/davis/JPEGImages/480p \
   --gt-root /mnt/data/davis/Annotations/480p \
