@@ -96,7 +96,7 @@ from pathlib import Path
 from src.data_loader import SequenceSpec, resolve_sequence_paths
 from src.model_inference import SAM2InferenceConfig, SAM2InferenceRunner
 
-spec = SequenceSpec(dataset="davis", sequence="bear", resolution="480p")
+spec = SequenceSpec(dataset="davis", sequence="bear")
 paths = resolve_sequence_paths(spec)
 cfg = SAM2InferenceConfig(
     checkpoint=Path("sam2/checkpoints/sam2.1_hiera_small.pt"),
